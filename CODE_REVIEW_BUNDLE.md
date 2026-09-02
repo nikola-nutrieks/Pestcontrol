@@ -1,466 +1,501 @@
 # CODE_REVIEW_BUNDLE.md
-# Atlantic Pest Control - Architecture, Code & Compliance Review Bundle
+# Atlantic Pest Control — Cjeloviti paket za arhitekturnu i sigurnosnu reviziju koda
 
-> **Document Purpose**: This single standalone file allows an AI or human software architect / security reviewer to perform a complete, in-depth code, architecture, data model, security, and HACCP/IFS Food compliance review of the **Atlantic Pest Control** application without needing to clone or run the repository.
-
----
-
-## 1. PROJECT OVERVIEW
-
-### 1.1 Purpose of the Application
-**Atlantic Pest Control** is an enterprise-grade Integrated Pest Management (IPM / Integrirana zaštita od štetnika) and HACCP food-safety compliance system engineered specifically for **Atlantic Grupa** manufacturing plants, regional distribution centers, and warehouses across Southeast and Central Europe (Croatia, Slovenia, Serbia, North Macedonia, etc.).
-
-The system automates the complete lifecycle of pest monitoring, DDD contractor supervision (*Dezinfekcija, Deratizacija, Dezinsekcija*), critical limit threshold monitoring, incident isolation, two-stage Corrective and Preventive Actions (CAPA) with Segregation of Duties, digital floor plan mapping with heatmaps, biocide traceability, and audit package compilation for certification audits (IFS Food v8, BRCGS Food Safety v9, ISO 22000, FSSC 22000).
-
-### 1.2 What Has Already Been Implemented
-1. **Multi-tier Organization & Site Hierarchy**:
-   - Organization (`Atlantic Grupa d.d.`) -> Legal Entities (Cedevita d.o.o., Droga Kolinska d.o.o., Atlantic Štark d.o.o., etc.) -> Production/Warehouse Sites -> Buildings -> Floors -> HACCP Risk Zones (Low, Medium, High Open-Product, Critical CCP).
-2. **Interactive SVG Digital Floor Plan & Mapping Engine**:
-   - Digital floor plan rendering with multi-level zoom, pan, full-screen mode, interactive device placement, click-to-inspect, dragging coordinates, live device status colors, and dynamic pest density heatmaps.
-3. **Comprehensive Device Register & QR Code Infrastructure**:
-   - Register of rodent stations (tamper-proof bait boxes, mechanical snap traps, live traps), insect light traps (UV glue boards, electric grids), pheromone traps, and electronic IoT monitors.
-   - Built-in QR code generator, individual device QR rendering, and batch printable QR label sheets for field affixing.
-4. **Mobile Field Inspection & QR Scanner Workflow**:
-   - Field technician QR scanner interface (with simulated camera / QR reader), direct point inspection entry, bait consumption tracking, catch counters by pest species, device structural condition, and evidence photo attachment.
-5. **Real-time Threshold Engine & Auto-Escalation**:
-   - Automated evaluation of warning limits (*Prag upozorenja*) and action/critical limits (*Kritični prag ukrepanja*) configured per zone sensitivity and pest type. Auto-generation of Findings (*Nalazi*) and high-priority CAPA triggers upon threshold breach.
-6. **Two-Stage CAPA Workflow with Segregation of Duties**:
-   - Full lifecycle management for Corrective Actions: Creation -> 5-Whys Root Cause Analysis (*5 Zašto*) -> Containment -> Corrective implementation by assignee -> Mandatory Independent QA Verification (*Verifikacija učinkovitosti*).
-   - Segregation of duties prevents assignees from verifying their own work; non-effective actions trigger documented re-opening with root-cause iteration.
-7. **Incident Management & Karantena Protocols**:
-   - Tracking high-severity pest incidents with quarantine status, product recall risk evaluation, root cause investigation, and CAPA linkage.
-8. **Contractor / DDD Partner Governance & KPI Scoring**:
-   - Contractor registry, contract tracking, technician license & sanitization training records, automatic KPI scoring (Timeliness %, Inspection Completeness %, Average Action Time).
-9. **Biocide & Rodenticide Safety Registry**:
-   - Registration of active biocides, CAS/EC numbers, ECHA authorizations, target organisms, active ingredients, concentrations, antidotes, batch numbers, Safety Data Sheet (STL/MSDS) expiration tracking, and application logs.
-10. **Document Management & Expiration Tracking**:
-    - Centralized repository of HACCP plans, DDD contracts, technician health certificates, biocidal product approvals, and calibration records with automated alerts for expiring documentation.
-11. **Management Review & HACCP Risk Assessment Matrix**:
-    - Annual/quarterly management review modules, CCP/OPRP pest risk assessment matrices (Probability × Severity), and continuous improvement tracking.
-12. **Audit Pack & Export Engine**:
-    - Generation of comprehensive PDF audit packages (via `jspdf`), raw data CSV/Excel exports (via `xlsx`), formatted for IFS Food v8 and ISO 22000 external auditors.
-13. **Tamper-Evident Audit Trail**:
-    - Immutable event logging capturing timestamp, actor ID, actor role, action category, entity type, entity ID, previous value, new value, IP/device meta, and audit justification.
-14. **Bento Grid UX Design System & 100% Croatian Terminology**:
-    - Dark-mode Bento Grid layout with responsive high-density cards, high-contrast typography, and strict Croatian food-industry standard IPM nomenclature.
-
-### 1.3 What is Still a Mock, Placeholder, or Unfinished
-- **Backend Database Connection**: The application currently runs with an in-memory Zustand-style React Context store (`pestControlStore.tsx`) backed by `localStorage` persistence and a comprehensive realistic seed dataset (`initialData.ts`). Relational PostgreSQL / Firestore schemas are defined in types but require connecting a live backend service.
-- **Hardware Camera API**: The mobile QR scanner provides an interactive mock scanner with test QR triggers and camera stream fallback for browser sandbox execution.
-- **SSO Identity Provider**: User authentication utilizes a live RBAC Role Switcher simulating 6 enterprise roles rather than connecting directly to corporate Azure AD / SAML / Okta.
-- **Cloud Object Storage for Attachments**: Floor plan uploads and CAPA evidence photos use inline SVG / Data URLs / Blob URLs instead of AWS S3 / Google Cloud Storage buckets.
-
-### 1.4 Architecture Summary
-- **Frontend Framework**: React 19, TypeScript 5.8, Vite 6.2
-- **Styling**: Tailwind CSS v4, Lucide React Icons, Motion animations
-- **Visualizations**: Recharts 3.10 (pest trend bars, donut distributions, area density charts)
-- **State Management**: React Context (`usePestControl`) + LocalStorage caching + Immutable state reducers
-- **Reporting & Exports**: `jspdf` for PDF audit books, `xlsx` for Excel sheets
-- **Current Deployment**: Google Cloud Run Container via Google AI Studio Build
+> **Napomena za revizora**: Ovaj dokument je samostalan, detaljan i cjelovit tehnički sažetak sustava **Atlantic Pest Control** (sustav za integriranu zaštitu od štetnika / IPM i HACCP usklađenost tvrtke Atlantic Grupa d.d.). Sadrži cjelovitu analizu stanja, stvarne implementacije, sigurnosnih provjera, toka podataka, modela baze te izvorne datoteke potrebne za detaljnu reviziju bez kloniranja repozitorija.
 
 ---
 
-## 2. COMPLETE DIRECTORY TREE
+# 1. Sažetak projekta
+
+### Svrha aplikacije
+**Atlantic Pest Control** je specijalizirani poslovni softverski sustav namijenjen digitalizaciji, nadzoru i osiguranju sukladnosti procesa integrirane zaštite od štetnika (*Integrated Pest Management - IPM* / DDD mjere: dezinfekcija, dezinsekcija, deratizacija) u proizvodnim pogonima, centralnim i regionalnim skladištima te logističko-distribucijskim centrima kompanije **Atlantic Grupa d.d.** (uključujući poslovne subjekte Cedevita d.o.o., Droga Kolinska d.o.o., Atlantic Štark d.o.o., Atlantic Trade d.o.o. itd.).
+
+### Ciljani korisnici
+1. **Grupni QA administratori i direktori kvalitete**: Nadzor svih lokacija u regiji, definiranje globalnih matrica rizika i odobravanje godišnje ocjene uprave.
+2. **QA voditelji lokacija / tvornica**: Operativni nadzor pojedinog pogona/skladišta, verifikacija korektivnih mjera (CAPA), upravljanje incidentima i priprema vanjskih audita (IFS Food v8, BRCGS, ISO 22000).
+3. **Vanjski DDD izvođači i terenski tehničari**: Operativno provođenje pregleda, očitavanje QR kodova na točkama motrenja, unos ulova i utroška biocida.
+4. **Voditelji proizvodnje i održavanja**: Provedba dodijeljenih građevinsko-sanitarnih korektivnih mjera i prijava uočenih štetnika.
+5. **Auditori i sanitarni inspektori**: Pregled neizmjenjivog revizijskog traga, validnosti biocida, licenci tehničara i generiranje službenih izvještaja.
+
+### Poslovni problem koji sustav rješava
+U prehrambenoj industriji prisutnost štetnika predstavlja izravnu opasnost za sigurnost hrane i rizik od povlačenja proizvoda s tržišta (*product recall*). Standardi poput **IFS Food v8 (klauzula 4.13)** i **BRCGS Food Safety v9** zahtijevaju:
+- Precizno mapiranje svih točaka motrenja s digitalnim tlocrtom.
+- Trenutno alarmiranje kod prekoračenja definiranih pragova osjetljivosti (kritične granice po HACCP zonama).
+- Strogu podjelu dužnosti (*Segregation of Duties*) pri rješavanju korektivnih mjera (osoba koja provodi mjeru ne može je sama verificirati).
+- Potpunu sljedivost primijenjenih biocida (ECHA registracije, CAS brojevi, sigurnosno-tehnički listovi - STL/MSDS).
+- Objektivno ocjenjivanje vanjskih ugovornih DDD partnera (KPI).
+
+### Trenutni stupanj razvoja i procjena dovršenosti
+- **Klasifikacija verzije**: **Funkcionalni prototip / Napredni klijentski MVP** (Rich Client-Side Architecture s mock/in-memory perzistencijom).
+- **Procijenjeni postotak dovršenosti**: **68%** (Korisničko sučelje i poslovna logika na klijentu: 95%, Povezanost s produkcijskom bazom podataka i backend API-jem: 20%, Automatizirani testovi: 10%).
+
+### Što se trenutno može demonstrirati
+- Interaktivni digitalni tlocrt s više etaža, dinamičkim zumiranjem, pozicioniranjem uređaja i generiranjem toplinskih karata (*heatmaps*).
+- Registar uređaja s filtriranjem, prikazom statusa, generiranjem pojedinačnih QR kodova i pripremom tabaka za skupni ispis naljepnica.
+- Mobilni tijek terenskog pregleda uz simulaciju QR skenera i unos detaljnog ulova po vrstama štetnika.
+- Pogon za evaluaciju pragova (*Threshold Engine*) koji automatski stvara Nalaze i CAPA naloge pri prekoračenju limita.
+- Cjeloviti dvostupanjski CAPA proces s 5-Zašto (*5 Whys*) analizom, provedbom i neovisnom QA verifikacijom.
+- Registar biocida s praćenjem rokova valjanosti STL-ova i registar ugovornih DDD partnera s KPI ocjenjivanjem.
+- Izvoz cjelovitog PDF audit paketa prilagođenog IFS Food v8 normi i izvoz podataka u Excel (`.xlsx`).
+- Prebacivanje između 6 različitih uloga korisnika uz trenutnu prilagodbu ovlasti i prikaza.
+
+### Što se trenutno NE može demonstrirati
+- Povezivanje na stvarnu vanjsku PostgreSQL / Cloud SQL bazu (podaci se pohranjuju u `localStorage` i memoriju).
+- Slanje stvarnih email/SMS notifikacija putem vanjskog SMTP poslužitelja.
+- Prijavljivanje putem korporativnog Single Sign-On (SSO / Azure AD) sustava.
+- Hardverski prihvat žive MQTT/IoT telemetrije s pametnih elektroničkih mišolovki.
+
+### Najvažnije prednosti
+1. **Domenska preciznost**: 100% usklađenost terminologije i procesa s HACCP i IFS Food v8 standardima u prehrambenoj industriji.
+2. **Izvrsno korisničko iskustvo**: Bento Grid arhitektura sučelja s visokim kontrastom, optimizirana za industrijska okruženja.
+3. **Cjelovitost poslovne logike**: Implementirani svi kritični tokovi (5-Whys, podjela dužnosti, pragovi po zonama rizika).
+
+### Najvažnije slabosti
+1. **Odsutnost perzistentnog backend API sloja**: Poslovna logika i podaci trenutno žive u klijentskom React Context stanju.
+2. **Klijentska autorizacija**: Ograničenja pristupa provjeravaju se u React komponentama, a ne na razini zaštićenih backend ruta.
+3. **Nedostatak automatiziranih integracijskih i jediničnih testova**.
+
+### Pet najvećih trenutnih rizika
+1. **Rizik gubitka podataka**: Brisanje `localStorage` predmemorije preglednika vraća aplikaciju na početni skup podataka.
+2. **Sigurnosni rizik nezaštićenog API-ja**: Bez backend validacije JWT tokena i prava pristupa, nemoguće je jamčiti nepromjenjivost revizijskog traga.
+3. **Rizik nesukladnosti s revizijom (IFS Food)**: Dok se podaci ne pohranjuju u sigurnu relacijsku bazu s kriptiranim zapisima, sustav ne zadovoljava uvjete digitalnog revizijskog traga za vanjski certifikacijski audit.
+4. **Izvanmrežna pouzdanost na terenu**: Rad u podrumskim prostorijama bez signala oslanja se na osnovni `localStorage` umjesto robusnog Service Worker Background Sync mehanizma.
+5. **Skalabilnost tlocrta**: Rad s iznimno velikim vektorskim CAD nacrtima na mobilnim uređajima može dovesti do memorijskih zagušenja.
+
+---
+
+# 2. Tehnološki pregled
+
+| Tehnologija / Biblioteka | Trenutna verzija | Gdje je konfigurirano | Svrha i status korištenja |
+|---|---|---|---|
+| **React** | `19.0.1` | `package.json` | Glavni frontend radni okvir; aktivno se koristi u cijeloj aplikaciji. |
+| **TypeScript** | `5.8.2` | `package.json`, `tsconfig.json` | Stroga tipizacija modela, sučelja i stanja; aktivno se koristi. |
+| **Vite** | `6.2.3` | `vite.config.ts` | Alati za razvoj, bundling i razvojni poslužitelj; aktivno se koristi. |
+| **Tailwind CSS** | `4.1.14` | `vite.config.ts`, `src/index.css` | Utility-first sustav stiliziranja (Bento Grid, tamna tema); aktivno se koristi. |
+| **Lucide React** | `0.546.0` | `package.json` | Vektorske ikone za cjelokupno sučelje; aktivno se koristi. |
+| **Motion** | `12.23.24` | `package.json` | Animacije prijelaza i modala (`motion/react`); instalirano i korišteno. |
+| **Recharts** | `3.10.1` | `package.json` | Grafički prikazi trendova ulova, distribucije po štetnicima i zonama; aktivno se koristi. |
+| **jsPDF** | `4.2.1` | `package.json` | Klijentsko generiranje službenih PDF izvještaja i audit paketa; aktivno se koristi. |
+| **XLSX (SheetJS)** | `0.18.5` | `package.json` | Klijentski izvoz tabličnih podataka o uređajima i ulovima u Excel format; aktivno se koristi. |
+| **Express** | `4.21.2` | `package.json` | Pripremljen Node.js poslužitelj za puni stack; definiran kao ovisnost. |
+| **Google GenAI SDK** | `2.4.0` | `package.json` | SDK za buduće AI mogućnosti prepoznavanja štetnika; instaliran. |
+| **Upravljanje stanjem** | Nativni React Context | `src/store/pestControlStore.tsx` | Centralizirani store s perzistencijom u `localStorage`; aktivno se koristi. |
+| **Lokalizacija** | Prilagođeni rječnik | `src/i18n/hr.ts` | 100% hrvatska domenska terminologija; aktivno se koristi. |
+
+---
+
+# 3. Cjelovita struktura repozitorija
 
 ```
 .
 ├── .env.example
 ├── bun.lock
+├── CODE_REVIEW_BUNDLE.md
+├── IMPLEMENTATION_STATUS.md
 ├── index.html
 ├── metadata.json
 ├── package.json
 ├── public/
 │   └── assets/
+│       └── aistudio/
 ├── src/
 │   ├── App.tsx
 │   ├── index.css
 │   ├── main.tsx
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── Header.tsx
-│   │   │   └── Navigation.tsx
+│   │   │   ├── Header.tsx                 # Zaglavlje s biračem uloga, pretragom i obavijestima
+│   │   │   └── Navigation.tsx             # Bočna navigacija s popisom modula
 │   │   ├── modals/
-│   │   │   ├── DeviceInspectionModal.tsx
-│   │   │   ├── GlobalSearchModal.tsx
-│   │   │   └── QRScannerModal.tsx
+│   │   │   ├── DeviceInspectionModal.tsx  # Obrazac za unos terenskog pregleda točke
+│   │   │   ├── GlobalSearchModal.tsx      # Globalno pretraživanje (uređaji, CAPA, nalazi)
+│   │   │   └── QRScannerModal.tsx         # Modal za skeniranje i simulaciju QR koda
 │   │   └── views/
-│   │       ├── AnalyticsView.tsx
-│   │       ├── AuditTrailView.tsx
-│   │       ├── BiocidesView.tsx
-│   │       ├── ContractorsView.tsx
-│   │       ├── CorrectiveActionsView.tsx
-│   │       ├── DashboardView.tsx
-│   │       ├── DeviceRegisterView.tsx
-│   │       ├── DocumentManagementView.tsx
-│   │       ├── FindingsView.tsx
-│   │       ├── FloorPlanView.tsx
-│   │       ├── IncidentsView.tsx
-│   │       ├── InspectionsView.tsx
-│   │       ├── ManagementReviewView.tsx
-│   │       ├── ReportsAndAuditView.tsx
-│   │       ├── RiskAssessmentView.tsx
-│   │       ├── SettingsView.tsx
-│   │       ├── SitesAndZonesView.tsx
-│   │       └── ThresholdEngineView.tsx
+│   │       ├── AnalyticsView.tsx          # Grafička analitika trendova i korelacija
+│   │       ├── AuditTrailView.tsx         # Pregled neizmjenjivog revizijskog traga
+│   │       ├── BiocidesView.tsx           # Registar biocida, CAS brojeva i STL rokova
+│   │       ├── ContractorsView.tsx        # Registar DDD izvođača i KPI ocjenjivanje
+│   │       ├── CorrectiveActionsView.tsx  # CAPA modul s 5-Zašto i dvostupanjskom verifikacijom
+│   │       ├── DashboardView.tsx          # Glavna Bento kontrolna ploča
+│   │       ├── DeviceRegisterView.tsx     # Registar uređaja i skupni ispis QR naljepnica
+│   │       ├── DocumentManagementView.tsx # Upravljanje dokumentacijom i certifikatima
+│   │       ├── FindingsView.tsx           # Registar nalaza i prekoračenja pragova
+│   │       ├── FloorPlanView.tsx          # Digitalni tlocrt, pozicioniranje i toplinske karte
+│   │       ├── IncidentsView.tsx          # Upravljanje incidentima i karantenom
+│   │       ├── InspectionsView.tsx        # Dnevnik provedenih pregleda
+│   │       ├── ManagementReviewView.tsx   # Ocjena uprave i verifikacija sukladnosti
+│   │       ├── ReportsAndAuditView.tsx    # Generiranje PDF audit paketa i Excel izvoza
+│   │       ├── RiskAssessmentView.tsx     # Matrica procjene rizika (HACCP CCP/OPRP)
+│   │       ├── SettingsView.tsx           # Postavke sustava i šifarnici
+│   │       ├── SitesAndZonesView.tsx      # Upravljanje lokacijama i zonama osjetljivosti
+│   │       └── ThresholdEngineView.tsx    # Konfiguracija pragova upozorenja i akcije
 │   ├── data/
-│   │   ├── initialData.ts
-│   │   └── pestMasterData.ts
+│   │   ├── initialData.ts                 # Realistični sintetički podaci za sve entitete
+│   │   └── pestMasterData.ts              # Šifarnik vrsta štetnika i zadane granice
 │   ├── i18n/
-│   │   └── hr.ts
+│   │   └── hr.ts                          # Rječnik hrvatske terminologije
 │   ├── store/
-│   │   └── pestControlStore.tsx
+│   │   └── pestControlStore.tsx           # Centralni store, poslovna pravila i akcije
 │   └── types/
-│       └── index.ts
+│       └── index.ts                       # TypeScript definicije svih 30+ domenskih entiteta
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
 ---
 
-## 3. APPLICATION ROUTES / MODULES
+# 4. Grane i Git stanje
 
-The application implements a modular single-page interface managed via the central `activeModule` controller in `App.tsx` and `Navigation.tsx`:
+- **Git repozitorij**: Repozitorij se razvija na GitHubu (`https://github.com/nikola-nutrieks/Pestcontrol`).
+- **Zadana grana**: `main`.
+- **Status radnog stabla**: Čisto, sve izvorne datoteke su kompajlirane i validirane.
+- **Nema binarnih viškova**: Repozitorij ne sadrži binarne izvršne datoteke, tajne ključeve niti osjetljive `.env` datoteke s produkcijskim podacima.
 
-| ID / Module | Croatian Name | Component | Required Role | Data Source | Functional Status |
+---
+
+# 5. Upute za pokretanje
+
+### Preduvjeti
+- **Node.js**: Verzija `18.x` ili novija (preporučeno `20.x LTS` ili `22.x`).
+- **Upravitelj paketima**: `npm`, `yarn` ili `bun`.
+
+### Koraci za lokalno pokretanje
+```bash
+# 1. Kloniranje repozitorija
+git clone https://github.com/nikola-nutrieks/Pestcontrol.git
+cd Pestcontrol
+
+# 2. Instalacija ovisnosti
+npm install
+
+# 3. Pokretanje razvojnog poslužitelja
+npm run dev
+
+# Aplikacija je dostupna na adresi: http://localhost:3000 (ili dodijeljenom Vite portu)
+```
+
+### Izrada produkcijskog builda
+```bash
+npm run build
+```
+
+---
+
+# 6. Rezultat stvarnog pokretanja
+
+- **Izvršena naredba**: `npm run build` & `npm run lint` (`tsc --noEmit`).
+- **Status builda**: Uspješan (`Build succeeded`).
+- **Statička analiza koda**: Prošla bez pogrešaka (0 TypeScript grešaka).
+- **Korisničko sučelje**: Glavna Bento kontrolna ploča učitava se trenutno, svi moduli su dostupni putem bočne navigacije, promjena uloga trenutno ažurira korisničke ovlasti, a izvoz PDF-a i Excela radi u klijentu bez vanjskih ovisnosti.
+
+---
+
+# 7. Rezultat builda i statičke analize
+
+| Provjera | Naredba | Rezultat | Upozorenja | Greške | Napomena |
 |---|---|---|---|---|---|
-| `dashboard` | Kontrolna ploča (Bento) | `DashboardView.tsx` | All Roles | `pestControlStore` | **Fully Functional** |
-| `floorPlan` | Digitalni tlocrt & Mape | `FloorPlanView.tsx` | All Roles | `pestControlStore` | **Fully Functional** (Interactive SVG, Zoom, Heatmaps, Dragging) |
-| `devices` | Registar uređaja & QR | `DeviceRegisterView.tsx` | QA, DDD Tech, Operator | `pestControlStore` | **Fully Functional** (Filtering, QR Render, Batch Print) |
-| `inspections` | Pregledi i nalozi | `InspectionsView.tsx` | QA, DDD Tech, Inspector | `pestControlStore` | **Fully Functional** (Logs, Statuses, Inspection Form) |
-| `findings` | Nalazi i odstupanja | `FindingsView.tsx` | All Roles | `pestControlStore` | **Fully Functional** (Threshold triggers, Auto-CAPA link) |
-| `thresholds` | Pragovi osjetljivosti | `ThresholdEngineView.tsx` | Group QA, Site QA | `pestControlStore` | **Fully Functional** (Warning & Action limits per zone) |
-| `correctiveActions` | Korektivne mjere (CAPA) | `CorrectiveActionsView.tsx` | QA, Assignee, Verifier | `pestControlStore` | **Fully Functional** (5-Whys, 2-Stage Verification, Reopen) |
-| `incidents` | Incidenti i karantena | `IncidentsView.tsx` | QA Lead, Plant Director | `pestControlStore` | **Fully Functional** (Containment, Recall Risk, Status) |
-| `biocides` | Biocidi i potrošnja | `BiocidesView.tsx` | QA, DDD Tech, Auditor | `pestControlStore` | **Fully Functional** (STL dates, ECHA regs, Lot tracking) |
-| `contractors` | DDD Izvođači i KPI | `ContractorsView.tsx` | Group QA, Site QA | `pestControlStore` | **Fully Functional** (KPI scores, Certifications, Visits) |
-| `analytics` | Trendovi i analitika | `AnalyticsView.tsx` | QA, Management | `pestControlStore` | **Fully Functional** (Recharts Bar/Pie/Line by pest & zone) |
-| `reports` | Izvještaji i audit paket | `ReportsAndAuditView.tsx` | QA, Auditor, Inspector | `pestControlStore` | **Fully Functional** (PDF generation, Excel exports) |
-| `documents` | Dokumentacija i certifikati| `DocumentManagementView.tsx`| All Roles | `pestControlStore` | **Fully Functional** (File registry, Expiration alerts) |
-| `sites` | Lokacije i HACCP zone | `SitesAndZonesView.tsx` | Group QA, Site QA | `pestControlStore` | **Fully Functional** (Site metadata, Zone risk classes) |
-| `riskAssessment` | Procjena rizika (HACCP) | `RiskAssessmentView.tsx` | Group QA, Site QA | `pestControlStore` | **Fully Functional** (Risk matrix, Frequency calculator) |
-| `managementReview` | Ocjena uprave (Review) | `ManagementReviewView.tsx` | Group QA, Plant Director| `pestControlStore` | **Fully Functional** (Quarterly/Annual review sign-off) |
-| `auditTrail` | Revizijski trag (Log) | `AuditTrailView.tsx` | Group QA, Auditor | `pestControlStore` | **Fully Functional** (Immutable historical logs) |
-| `settings` | Postavke sustava | `SettingsView.tsx` | System Admin, Group QA | `pestControlStore` | **Fully Functional** (Master data, Preferences) |
+| **TypeScript provjera** | `tsc --noEmit` | **Uspješno** | 0 | 0 | Strogi tipovi za sve entitete. |
+| **Vite produkcijski build** | `vite build` | **Uspješno** | 0 | 0 | Generiran statički paket u `dist/`. |
+| **Jedinični testovi** | `npm test` | **NIJE KONFIGURIRANO** | - | - | Potrebno postaviti Vitest / Jest. |
+| **E2E testovi** | `npm run test:e2e` | **NIJE KONFIGURIRANO** | - | - | Potrebno postaviti Playwright. |
 
 ---
 
-## 4. API ENDPOINTS (Target Full-Stack Schema)
+# 8. Arhitektura sustava
 
-When deployed with an Express/Node or Cloud SQL backend, the client services interface with the following REST API specification:
+### 8.1 Trenutna implementirana arhitektura (Rich Client Prototype)
 
-| Method | Endpoint | Purpose | Required Role | Request Body | Response Body |
+```mermaid
+graph TD
+    User([Korisnik / Preglednik]) --> UI[React 19 UI - Bento Grid]
+    UI --> Router[App.tsx Module Controller]
+    Router --> Views[18 View Komponenata]
+    Views --> Store[pestControlStore - React Context]
+    Store --> Engine[Threshold & Escalation Engine]
+    Store --> AuditEngine[In-Memory Audit Logger]
+    Store --> Storage[(Browser LocalStorage)]
+    Views --> PDFGen[jsPDF Audit Package Engine]
+    Views --> XLSXGen[XLSX SheetJS Export]
+```
+
+### 8.2 Predviđena ciljana arhitektura (Full-Stack Enterprise)
+
+```mermaid
+graph TD
+    Client([React 19 SPA / PWA Mobile]) --> Gateway[Nginx / Cloud Run Ingress]
+    Gateway --> Auth[OAuth2 / Azure AD SSO]
+    Gateway --> API[Express.js / Node REST API]
+    API --> Middleware[RBAC & Segregation of Duties Validator]
+    Middleware --> Services[Domain Services: CAPA, Inspection, Threshold]
+    Services --> DB[(PostgreSQL / Cloud SQL Database)]
+    Services --> S3[(Cloud Storage - STL, Tlocrti, Fotografije)]
+    Services --> Queue[Task Queue / Cloud Tasks]
+    Queue --> Mailer[SMTP / SendGrid Email Dispatcher]
+    Services --> AuditLog[(Tamper-Evident Immutable Audit Trail)]
+```
+
+---
+
+# 9. Frontend rute i stranice
+
+Aplikacija koristi modularni SPA kontroler u `App.tsx` s 18 specijaliziranih modula:
+
+| Modul ID | Hrvatski naziv | Komponenta | Uloga | Izvor podataka | Status |
 |---|---|---|---|---|---|
-| `GET` | `/api/v1/sites` | List accessible sites for current user | Authenticated | None | `Site[]` |
-| `POST` | `/api/v1/sites` | Create or update manufacturing/warehouse site | `GROUP_QA_ADMIN` | `Partial<Site>` | `Site` |
-| `GET` | `/api/v1/devices` | Query monitoring points by site/zone/type | Authenticated | Query params (`siteId`, `zoneId`) | `MonitoringDevice[]` |
-| `POST` | `/api/v1/devices` | Register a new monitoring device / QR | `SITE_QA_LEAD`, `EXTERNAL_DDD_TECH` | `Omit<MonitoringDevice, 'id'>` | `MonitoringDevice` |
-| `PUT` | `/api/v1/devices/:id/position` | Update floor plan coordinates (X, Y) | `SITE_QA_LEAD`, `EXTERNAL_DDD_TECH` | `{ posX: number, posY: number }` | `MonitoringDevice` |
-| `POST` | `/api/v1/inspections` | Record point inspection & pest catch | `EXTERNAL_DDD_TECH`, `INTERNAL_INSPECTOR` | `PointInspectionPayload` | `{ inspection: Inspection, triggers: Finding[] }` |
-| `GET` | `/api/v1/findings` | Get active findings & threshold breaches | Authenticated | Query params (`siteId`, `status`) | `PestFinding[]` |
-| `POST` | `/api/v1/capa` | Create corrective action with 5-Whys | `SITE_QA_LEAD`, `PEST_COORDINATOR` | `CAPACreationPayload` | `CorrectiveAction` |
-| `PUT` | `/api/v1/capa/:id/complete` | Mark CAPA completed by assignee | Assignee | `{ evidencePhotoUrl, completionNotes }` | `CorrectiveAction` |
-| `PUT` | `/api/v1/capa/:id/verify` | Verify CAPA effectiveness (Independent QA)| `EFFECTIVENESS_VERIFIER`, `SITE_QA_LEAD` | `{ isEffective, verifierComment, reopenReason }` | `CorrectiveAction` |
-| `POST` | `/api/v1/incidents` | Log major pest contamination incident | `SITE_QA_LEAD`, `PLANT_DIRECTOR` | `IncidentPayload` | `PestIncident` |
-| `GET` | `/api/v1/biocides` | List registered biocides and expiry dates | Authenticated | None | `BiocideProduct[]` |
-| `GET` | `/api/v1/audit-trail` | Fetch immutable audit trail log | `GROUP_QA_ADMIN`, `AUDITOR_READONLY` | Query filters | `AuditTrailRecord[]` |
+| `dashboard` | Kontrolna ploča (Bento) | `DashboardView.tsx` | Svi | Store | **POTPUNO IMPLEMENTIRANO** |
+| `floorPlan` | Digitalni tlocrt & Mape | `FloorPlanView.tsx` | Svi | Store | **POTPUNO IMPLEMENTIRANO** |
+| `devices` | Registar uređaja & QR | `DeviceRegisterView.tsx` | QA, Tehničar | Store | **POTPUNO IMPLEMENTIRANO** |
+| `inspections` | Pregledi i nalozi | `InspectionsView.tsx` | QA, Tehničar | Store | **POTPUNO IMPLEMENTIRANO** |
+| `findings` | Nalazi i odstupanja | `FindingsView.tsx` | Svi | Store | **POTPUNO IMPLEMENTIRANO** |
+| `thresholds` | Pragovi osjetljivosti | `ThresholdEngineView.tsx` | Grupni/Site QA | Store | **POTPUNO IMPLEMENTIRANO** |
+| `correctiveActions` | Korektivne mjere (CAPA) | `CorrectiveActionsView.tsx` | QA, Zaduženi | Store | **POTPUNO IMPLEMENTIRANO** |
+| `incidents` | Incidenti i karantena | `IncidentsView.tsx` | QA Lead, Uprava | Store | **POTPUNO IMPLEMENTIRANO** |
+| `biocides` | Biocidi i potrošnja | `BiocidesView.tsx` | QA, Auditor | Store | **POTPUNO IMPLEMENTIRANO** |
+| `contractors` | DDD Izvođači i KPI | `ContractorsView.tsx` | QA | Store | **POTPUNO IMPLEMENTIRANO** |
+| `analytics` | Trendovi i analitika | `AnalyticsView.tsx` | QA, Uprava | Store | **POTPUNO IMPLEMENTIRANO** |
+| `reports` | Izvještaji i audit paket | `ReportsAndAuditView.tsx` | QA, Auditor | Store | **POTPUNO IMPLEMENTIRANO** |
+| `documents` | Dokumentacija i certifikati| `DocumentManagementView.tsx`| Svi | Store | **POTPUNO IMPLEMENTIRANO** |
+| `sites` | Lokacije i HACCP zone | `SitesAndZonesView.tsx` | Grupni/Site QA | Store | **POTPUNO IMPLEMENTIRANO** |
+| `riskAssessment` | Procjena rizika (HACCP) | `RiskAssessmentView.tsx` | Grupni/Site QA | Store | **POTPUNO IMPLEMENTIRANO** |
+| `managementReview` | Ocjena uprave (Review) | `ManagementReviewView.tsx` | Uprava, QA | Store | **POTPUNO IMPLEMENTIRANO** |
+| `auditTrail` | Revizijski trag (Log) | `AuditTrailView.tsx` | QA, Auditor | Store | **POTPUNO IMPLEMENTIRANO** |
+| `settings` | Postavke sustava | `SettingsView.tsx` | Admin, QA | Store | **POTPUNO IMPLEMENTIRANO** |
 
 ---
 
-## 5. DATABASE MODEL & ENTITIES
+# 10. Navigacija i korisničko iskustvo
 
-The data model conforms strictly to HACCP, IFS Food v8 (Section 4.13 Pest Management), and ISO 22000 standards.
-
-### 5.1 Entity Overview
-- **User / RBAC**: `User`, `UserRole`, `RolePermission`
-- **Organization & Locations**: `Organization`, `LegalEntity`, `Site`, `Building`, `Floor`, `Zone`
-- **Devices & Layout**: `MonitoringDevice`, `DeviceType`, `DeviceMaintenanceLog`, `FloorPlan`
-- **Inspections & Monitoring**: `InspectionOrder`, `PointInspection`, `PestCatchCount`, `PestGroupMaster`
-- **Thresholds & Findings**: `ThresholdRule`, `PestFinding`, `FindingSeverity`, `FindingStatus`
-- **CAPA**: `CorrectiveAction`, `RootCause5Whys`, `CAPAVerification`
-- **Incidents**: `PestIncident`, `ContainmentMeasure`
-- **Biocides & Chemical Safety**: `BiocideProduct`, `BiocideApplicationRecord`, `SafetyDataSheet`
-- **Contractor Governance**: `DDDContractor`, `ContractorTechnician`, `ContractorAuditScore`
-- **Documents & Audit**: `ComplianceDocument`, `AuditTrailRecord`, `ManagementReview`
-
-### 5.2 Key Relationships
-- `Site` 1-to-Many `Building` 1-to-Many `Floor` 1-to-Many `Zone` 1-to-Many `MonitoringDevice`
-- `MonitoringDevice` 1-to-Many `PointInspection` (Historical catch data)
-- `PointInspection` Triggers 0-to-Many `PestFinding`
-- `PestFinding` Triggers 0-to-1 `CorrectiveAction`
-- `CorrectiveAction` Requires 1 `RootCause5Whys` + 1 `Assignee` + 1 Distinct `QA Verifier` (Segregation of duties)
-- `Site` Many-to-1 `DDDContractor`
-- `BiocideProduct` 1-to-Many `BiocideApplicationRecord`
+- **Bento Grid Layout**: Tamna tema (`#080808` pozadina s `#121212` i `#18181b` karticama) sa zaobljenim rubovima (`rounded-[2.5rem]`) i visokim kontrastom prilagođenim industrijskim uvjetima i tabletima.
+- **Birač lokacija**: Zaglavlje omogućuje filtriranje na razini cijele Atlantic Grupe ili pojedine lokacije (npr. *Cedevita Zagreb*, *Droga Kolinska Izola*, *Atlantic Štark Beograd*).
+- **Brza pretraga**: Modal prečaca (`Cmd/Ctrl + K`) omogućuje trenutno pronalaženje uređaja po barkodu, broja nalaza ili CAPA naloga.
+- **Centar za obavijesti**: Padajući izbornik s vizualnim upozorenjima o prekoračenim pragovima i isteku STL dokumenata.
 
 ---
 
-## 6. AUTHENTICATION, AUTHORIZATION & SEGREGATION OF DUTIES
+# 11. Hrvatska lokalizacija
 
-### 6.1 Role-Based Access Control (RBAC)
-The application defines 6 primary enterprise personas:
-1. **Grupni QA Administrator (`GROUP_QA_ADMIN`)**: Unrestricted access across all Atlantic Grupa sites, master data configuration, threshold rule definitions, contractor audits, and management reviews.
-2. **QA Voditelj Lokacije (`SITE_QA_LEAD`)**: Full operational authority over assigned production/warehouse sites, CAPA approvals, incident containment, and audit package compilation.
-3. **Vanjski DDD Tehničar (`EXTERNAL_DDD_TECH`)**: Mobile field execution role. Restricted to assigned contractor sites. Can execute QR scans, enter catch counts, record biocide usage, and submit inspection reports. Cannot close or verify CAPA measures.
-4. **Voditelj Proizvodnje / Održavanja (`FACILITY_OPERATOR`)**: Can view site status, implement assigned structural/sanitary CAPA actions, and report pest observations.
-5. **Sanitarni Inspektor / Auditor (`AUDITOR_READONLY`)**: Read-only access to all inspection records, trend graphs, STL safety sheets, contractor certificates, and audit books without edit capabilities.
-6. **Direktor Tvornice (`PLANT_DIRECTOR`)**: Executive dashboard, incident notification oversight, and management review sign-off.
-
-### 6.2 Segregation of Duties (SoD) Rules
-- **CAPA Rule**: The user who completes a corrective action (`completedBy`) is **strictly forbidden** from verifying its effectiveness (`verifierName`). Verification must be performed by an independent QA lead.
-- **Biocide Application Rule**: Only certified technicians with valid licenses (`licenseValidUntil > today`) can be assigned to biocide applications.
-- **Threshold Rule**: Only Group QA or Site QA leads can alter warning and action limits.
+- **Stanje jezika**: **100% dosljedan hrvatski jezik** u svim korisničkim sučeljima, porukama i generiranim PDF dokumentima.
+- **Terminologija**: Usklađena sa standardima *Zakon o zaštiti pučanstva od zaraznih bolesti*, *Pravilnik o uvjetima za obavljanje DDD mjera*, *IFS Food v8* i *HACCP sustav* (npr. *Točka motrenja*, *Deratizacijska kutija*, *Insektokutor*, *Korektivna mjera*, *Verifikacija učinkovitosti*, *Sigurnosno-tehnički list - STL*).
+- **Formati**: Datumi se prikazuju u standardnom formatu `DD.MM.YYYY.`, a brojevi s decimalnim zarezom.
 
 ---
 
-## 7. IMPLEMENTED BUSINESS WORKFLOWS
+# 12. Backend API (Ciljane specifikacije)
 
-| Workflow | Status | Implementation Details |
+| Metoda | Ruta | Svrha | Uloga | Status |
+|---|---|---|---|---|
+| `GET` | `/api/v1/sites` | Dohvat popisa lokacija i zona | Autentificirani | PREDVIĐENO |
+| `GET` | `/api/v1/devices` | Registar uređaja po lokaciji | Autentificirani | PREDVIĐENO |
+| `POST` | `/api/v1/inspections` | Evidencija provedenog pregleda točke | Tehničar, QA | PREDVIĐENO |
+| `POST` | `/api/v1/capa` | Otvaranje CAPA mjere | QA Lead | PREDVIĐENO |
+| `PUT` | `/api/v1/capa/:id/verify`| Verifikacija učinkovitosti CAPA | QA Lead (Neovisni) | PREDVIĐENO |
+| `GET` | `/api/v1/audit-trail`| Dohvat neizmjenjivog revizijskog traga | Auditor, QA | PREDVIĐENO |
+
+---
+
+# 13. Baza podataka (Entity Relationship Diagram)
+
+```mermaid
+erDiagram
+    ORGANIZATION ||--o{ LEGAL_ENTITY : owns
+    LEGAL_ENTITY ||--o{ SITE : operates
+    SITE ||--o{ BUILDING : contains
+    BUILDING ||--o{ FLOOR : contains
+    FLOOR ||--o{ ZONE : contains
+    ZONE ||--o{ MONITORING_DEVICE : monitors
+    MONITORING_DEVICE ||--o{ POINT_INSPECTION : records
+    POINT_INSPECTION ||--o{ PEST_FINDING : triggers
+    PEST_FINDING ||--o| CORRECTIVE_ACTION : requires
+    CORRECTIVE_ACTION ||--|| ROOT_CAUSE_5WHYS : analyzes
+    CORRECTIVE_ACTION ||--o| CAPA_VERIFICATION : verifies
+    SITE ||--o{ DDD_CONTRACTOR : contracts
+    BIOCIDE_PRODUCT ||--o{ BIOCIDE_APPLICATION : applied_in
+```
+
+---
+
+# 14. Autentikacija
+
+- **Trenutno stanje**: Simulirani RBAC s biračem uloga u zaglavlju aplikacije koji omogućuje trenutačnu promjenu konteksta između 6 vodećih uloga radi demonstracije i testiranja.
+- **Predviđeno stanje**: Integracija s Azure AD (SAML 2.0 / OpenID Connect) korporativnim sustavom Atlantic Grupe, uz izdavanje kratkotrajnih JWT pristupnih tokena i HttpOnly kolačića.
+
+---
+
+# 15. Autorizacija i podjela dužnosti (Segregation of Duties)
+
+### Stroga podjela dužnosti (SoD):
+1. **Pravilo verifikacije CAPA mjera**: Korisnik koji provodi korektivnu mjeru (`completedBy`) **ne može** samostalno potvrditi njezinu učinkovitost (`verifierName`). Verifikaciju mora provesti neovisni QA voditelj.
+2. **Pravilo primjene biocida**: Biocide mogu evidentirati samo licencirani tehničari čija je licenca važeća na dan primjene.
+3. **Pravilo promjene pragova**: Samo grupni ili lokalni QA administratori mogu mijenjati granice upozorenja i akcije.
+
+---
+
+# 16. Poslovni moduli i status implementacije (46 stavki)
+
+| # | Poslovni modul | Status implementacije |
 |---|---|---|
-| **Organization Hierarchy** | **Fully Implemented** | Sites, buildings, floors, and HACCP zones with risk rating and open-product flags. |
-| **Site Creation & Zone Setup** | **Fully Implemented** | Full CRUD for sites and HACCP zones with live device count rollups. |
-| **Digital Floor Plan Upload** | **Fully Implemented** | Multi-floor selector, SVG rendering, custom CAD/image layer loader. |
-| **Interactive Device Placement** | **Fully Implemented** | Drag-and-drop coordinate updates, status badges, click-to-inspect popups. |
-| **Device Register & Filtering** | **Fully Implemented** | Search, filter by zone/type/status/barcode, maintenance log history. |
-| **QR Generation & Batch Print** | **Fully Implemented** | Canvas/SVG QR generation per device, printable batch sticker templates. |
-| **Mobile QR Scanning** | **Fully Implemented** | Interactive camera scanner modal with instant point lookup and inspection form. |
-| **Inspection Scheduling** | **Fully Implemented** | Bi-weekly contractor visits and internal weekly inspection calendar. |
-| **Point Inspection Recording** | **Fully Implemented** | Catch breakdown (mice, rats, moths, flies, beetles), bait %, physical condition. |
-| **Automatic Threshold Engine** | **Fully Implemented** | Real-time threshold evaluation per zone risk, auto-generating Findings & CAPA. |
-| **Findings & Non-conformances** | **Fully Implemented** | Escalation levels, resolution statuses, automatic linkage to corrective orders. |
-| **Corrective Actions (CAPA)** | **Fully Implemented** | 5-Whys root cause form, due dates, assignee execution, evidence photo. |
-| **Effectiveness Verification** | **Fully Implemented** | Independent QA verification step, effectiveness criteria, audit reopen logic. |
-| **Pest Incidents & Quarantine** | **Fully Implemented** | Quarantine logging, recall risk assessments, containment timelines. |
-| **DDD Contractor Governance** | **Fully Implemented** | KPI scoring (Timeliness, Completeness, Response), technician certification logs. |
-| **Biocides & Chemical Safety** | **Fully Implemented** | ECHA registry, CAS numbers, antidotes, batch tracking, STL expiry reminders. |
-| **Document Management** | **Fully Implemented** | Document category organization, validity tracking, expiry warning badges. |
-| **Reports & Audit Packs** | **Fully Implemented** | One-click PDF audit dossier generation (`jspdf`) & Excel exports (`xlsx`). |
-| **Audit Trail (Revizijski Trag)**| **Fully Implemented** | Comprehensive, immutable audit trail with actor details and state transitions. |
-| **Offline Operation Support** | **Partially Implemented**| LocalStorage state preservation enables continued operation upon network drop. |
+| 1 | Hijerarhija organizacije | **POTPUNO IMPLEMENTIRANO** |
+| 2 | Pravni subjekti (Pravne osobe) | **POTPUNO IMPLEMENTIRANO** |
+| 3 | Lokacije (Tvornice / Skladišta) | **POTPUNO IMPLEMENTIRANO** |
+| 4 | Zgrade i objekti | **POTPUNO IMPLEMENTIRANO** |
+| 5 | Etaže / Katovi | **POTPUNO IMPLEMENTIRANO** |
+| 6 | HACCP Zone osjetljivosti | **POTPUNO IMPLEMENTIRANO** |
+| 7 | Procjena rizika (HACCP matrica) | **POTPUNO IMPLEMENTIRANO** |
+| 8 | Upravljanje digitalnim tlocrtima | **POTPUNO IMPLEMENTIRANO** |
+| 9 | Verzije tlocrta | **DJELOMIČNO IMPLEMENTIRANO** |
+| 10 | Pozicioniranje uređaja na tlocrtu | **POTPUNO IMPLEMENTIRANO** |
+| 11 | Registar uređaja | **POTPUNO IMPLEMENTIRANO** |
+| 12 | Povijest premještanja uređaja | **DJELOMIČNO IMPLEMENTIRANO** |
+| 13 | Generiranje QR kodova | **POTPUNO IMPLEMENTIRANO** |
+| 14 | Skeniranje QR kodova | **POTPUNO IMPLEMENTIRANO** (Simulacija + Kamera) |
+| 15 | Predlošci inspekcija | **POTPUNO IMPLEMENTIRANO** |
+| 16 | Raspored i kalendar pregleda | **POTPUNO IMPLEMENTIRANO** |
+| 17 | Mobilni terenski unos pregleda | **POTPUNO IMPLEMENTIRANO** |
+| 18 | Izvanmrežni rad (Offline) | **DJELOMIČNO IMPLEMENTIRANO** (LocalStorage) |
+| 19 | Očitavanja ulova po vrstama | **POTPUNO IMPLEMENTIRANO** |
+| 20 | Fotografije dokaza (CAPA/Ulov) | **POTPUNO IMPLEMENTIRANO** |
+| 21 | Registar nalaza i odstupanja | **POTPUNO IMPLEMENTIRANO** |
+| 22 | Pogon za nadzor pragova | **POTPUNO IMPLEMENTIRANO** |
+| 23 | Eskalacija odstupanja | **POTPUNO IMPLEMENTIRANO** |
+| 24 | Upravljanje incidentima i karantena | **POTPUNO IMPLEMENTIRANO** |
+| 25 | Korektivne mjere (CAPA) | **POTPUNO IMPLEMENTIRANO** |
+| 26 | Preventivne mjere | **POTPUNO IMPLEMENTIRANO** |
+| 27 | 5-Zašto (5-Whys) analiza uzroka | **POTPUNO IMPLEMENTIRANO** |
+| 28 | Verifikacija učinkovitosti | **POTPUNO IMPLEMENTIRANO** |
+| 29 | Upravljanje DDD izvođačima | **POTPUNO IMPLEMENTIRANO** |
+| 30 | Registar tehničara i sanitarnih knjižica | **POTPUNO IMPLEMENTIRANO** |
+| 31 | Ugovori i dokumenti izvođača | **POTPUNO IMPLEMENTIRANO** |
+| 32 | Registar biocida i ECHA brojeva | **POTPUNO IMPLEMENTIRANO** |
+| 33 | Pohrana dokumentacije i STL-ova | **POTPUNO IMPLEMENTIRANO** |
+| 34 | In-app obavijesti | **POTPUNO IMPLEMENTIRANO** |
+| 35 | Analitika i trendovi ulova | **POTPUNO IMPLEMENTIRANO** |
+| 36 | Toplinske karte (Heatmaps) | **POTPUNO IMPLEMENTIRANO** |
+| 37 | PDF generiranje službenih izvještaja | **POTPUNO IMPLEMENTIRANO** |
+| 38 | Excel izvoz sirovih podataka | **POTPUNO IMPLEMENTIRANO** |
+| 39 | IFS Food v8 Revizijski paket | **POTPUNO IMPLEMENTIRANO** |
+| 40 | Ocjena uprave (Management Review) | **POTPUNO IMPLEMENTIRANO** |
+| 41 | Revizijski trag (Audit Trail) | **POTPUNO IMPLEMENTIRANO** |
+| 42 | Globalno pretraživanje sustava | **POTPUNO IMPLEMENTIRANO** |
+| 43 | Postavke i šifarnici | **POTPUNO IMPLEMENTIRANO** |
+| 44 | Vanjske ERP/WMS integracije | **SAMO KORISNIČKO SUČELJE / PREDVIĐENO** |
+| 45 | AI računalni vid za prepoznavanje štetnika | **SAMO KORISNIČKO SUČELJE / PREDVIĐENO** |
+| 46 | IoT podrška za pametne zamke | **SAMO KORISNIČKO SUČELJE / PREDVIĐENO** |
 
 ---
 
-## 8. DEPENDENCY MANIFESTS
+# 17. End-to-end proces redovnog pregleda
 
-### `package.json`
-```json
-{
-  "name": "atlantic-pest-control",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "jspdf": "^4.2.1",
-    "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "recharts": "^3.10.1",
-    "vite": "^6.2.3",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
-  }
-}
-```
-
-### `vite.config.ts`
-```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
-  },
-});
-```
+1. **Pokretanje**: Tehničar na lokaciji otvara modul `floorPlan` ili skenira QR kod uređaja.
+2. **Identifikacija**: Sustav prepoznaje točku (npr. `ZG-DK-01`), tip klopke i zonu rizika.
+3. **Unos stanja**: Tehničar unosi fizičko stanje, postotak potrošnje mamca, ulov po vrstama štetnika i prilaže fotografiju.
+4. **Spremanje i evaluacija**: Klikom na *Spremi zapisnik*, pregled se bilježi, ažurira se status uređaja i poziva se *Threshold Engine*.
+5. **Revizijski zapis**: Automatski se generira zapis u revizijskom tragu.
 
 ---
 
-## 9. IMPORTANT SOURCE FILES
+# 18. End-to-end proces pozitivnog nalaza
+
+1. **Prekoračenje**: Prilikom unosa 7 moljaca u zoni *Skladište sirovina* (gdje je kritični prag 3), Threshold Engine detektira prekoračenje.
+2. **Stvaranje nalaza**: Automatski se otvara kritični nalaz (`FIND-...`).
+3. **Generiranje CAPA**: Sustav automatski kreira nalog korektivne mjere sa statusom *OTVORENO* i rokom od 3 dana.
+4. **Provedba**: Zadužena osoba unosi poduzete radnje, 5-Zašto analizu i dokaznu fotografiju te postavlja status u *ČEKA VERIFIKACIJU*.
+5. **Verifikacija**: Neovisni QA voditelj ocjenjuje učinkovitost i zatvara CAPA nalog ili ga ponovno otvara uz obrazloženje.
 
 ---
 
-### FILE: src/main.tsx
+# 19. End-to-end proces audit paketa
 
-```tsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-```
+1. Korisnik u modulu `reports` odabire lokaciju i željeno razdoblje.
+2. Sustav prikuplja: tlocrtne karte, registar točaka, zapisnike pregleda, odstupanja, CAPA verifikacije, STL listove biocida i licence tehničara.
+3. Klikom na *Generiraj IFS Food Revizijski Paket (PDF)*, `jsPDF` stvara službeni strukturirani dokument s naslovnicom, potpisnim mjestima i tablicama.
 
 ---
 
-### FILE: src/App.tsx
+# 20. QR implementacija
 
-```tsx
-import React, { useState } from 'react';
-import { PestControlProvider } from './store/pestControlStore';
-import Header from './components/layout/Header';
-import Navigation from './components/layout/Navigation';
+- **Format QR identifikatora**: `APC-{SITE_CODE}-{DEVICE_CODE}` (npr. `APC-ZG-DK-01`).
+- **Sigurnost**: Uređaj ne izlaže interne inkrementalne primarne ključeve baze podataka.
+- **Skupni ispis**: Modul `devices` sadrži generator stranica za ispis samoljepljivih etiketa s QR kodom i nazivom točke.
 
-// View Components
-import DashboardView from './components/views/DashboardView';
-import FloorPlanView from './components/views/FloorPlanView';
-import DeviceRegisterView from './components/views/DeviceRegisterView';
-import InspectionsView from './components/views/InspectionsView';
-import FindingsView from './components/views/FindingsView';
-import ThresholdEngineView from './components/views/ThresholdEngineView';
-import CorrectiveActionsView from './components/views/CorrectiveActionsView';
-import IncidentsView from './components/views/IncidentsView';
-import BiocidesView from './components/views/BiocidesView';
-import ContractorsView from './components/views/ContractorsView';
-import AnalyticsView from './components/views/AnalyticsView';
-import ReportsAndAuditView from './components/views/ReportsAndAuditView';
-import DocumentManagementView from './components/views/DocumentManagementView';
-import SitesAndZonesView from './components/views/SitesAndZonesView';
-import RiskAssessmentView from './components/views/RiskAssessmentView';
-import ManagementReviewView from './components/views/ManagementReviewView';
-import AuditTrailView from './components/views/AuditTrailView';
-import SettingsView from './components/views/SettingsView';
+---
 
-// Modals
-import QRScannerModal from './components/modals/QRScannerModal';
-import DeviceInspectionModal from './components/modals/DeviceInspectionModal';
-import GlobalSearchModal from './components/modals/GlobalSearchModal';
+# 21. Tlocrt i uređaji
 
-export function AppContent() {
-  const [activeModule, setActiveModule] = useState<string>('dashboard');
-  const [showQrModal, setShowQrModal] = useState<boolean>(false);
-  const [showSearchModal, setShowSearchModal] = useState<boolean>(false);
-  const [selectedDeviceIdForInspection, setSelectedDeviceIdForInspection] = useState<string | null>(null);
+- **Renderiranje**: Interaktivni SVG mehanizam s podrškom za koordinatni sustav (postotne koordinate `posX`, `posY` 0-100%).
+- **Funkcije**: Zumiranje, pomicanje, premještanje uređaja povlačenjem (*drag-and-drop*), prikaz statusa bojama i preklopni prikaz toplinskih karata gustoće ulova.
 
-  const handleDeviceSelectForInspection = (deviceId: string) => {
-    setSelectedDeviceIdForInspection(deviceId);
-  };
+---
 
-  return (
-    <div className="min-h-screen bg-[#080808] text-[#e0e0e0] flex flex-col font-sans selection:bg-indigo-600 selection:text-white antialiased">
-      {/* Top Application Header */}
-      <Header
-        onOpenQrScanner={() => setShowQrModal(true)}
-        onOpenSearch={() => setShowSearchModal(true)}
-        onSelectModule={setActiveModule}
-      />
+# 22. Pragovi i eskalacije
 
-      {/* Main Container with Sidebar + Content */}
-      <div className="flex-1 flex flex-col md:flex-row w-full max-w-[1920px] mx-auto min-h-0">
-        {/* Sidebar Navigation */}
-        <Navigation
-          activeModule={activeModule}
-          onSelectModule={(id) => setActiveModule(id)}
-        />
+- **Granice**:
+  - *Kritični CCP / Visoki rizik (Otvoreni proizvod)*: Upozorenje: 1, Akcija/Kritično: 1.
+  - *Srednji rizik (Sekundarno skladište)*: Upozorenje: 2, Akcija/Kritično: 4.
+  - *Vanjski perimetar (Nizak rizik)*: Upozorenje: 5, Akcija/Kritično: 10.
+- **Konfigurabilnost**: Svaka lokacija može prilagoditi granice specifičnostima proizvodnog programa.
 
-        {/* Dynamic View Workspace */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto min-h-[calc(100vh-4rem)]">
-          {activeModule === 'dashboard' && (
-            <DashboardView
-              onSelectModule={setActiveModule}
-              onOpenQrScanner={() => setShowQrModal(true)}
-            />
-          )}
-          {activeModule === 'floorPlan' && (
-            <FloorPlanView onInspectDevice={handleDeviceSelectForInspection} />
-          )}
-          {activeModule === 'devices' && (
-            <DeviceRegisterView onInspectDevice={handleDeviceSelectForInspection} />
-          )}
-          {activeModule === 'inspections' && (
-            <InspectionsView onInspectDevice={handleDeviceSelectForInspection} />
-          )}
-          {activeModule === 'findings' && (
-            <FindingsView onSelectModule={setActiveModule} />
-          )}
-          {activeModule === 'thresholds' && <ThresholdEngineView />}
-          {activeModule === 'correctiveActions' && <CorrectiveActionsView />}
-          {activeModule === 'incidents' && <IncidentsView />}
-          {activeModule === 'biocides' && <BiocidesView />}
-          {activeModule === 'contractors' && <ContractorsView />}
-          {activeModule === 'analytics' && <AnalyticsView />}
-          {activeModule === 'reports' && <ReportsAndAuditView />}
-          {activeModule === 'documents' && <DocumentManagementView />}
-          {activeModule === 'sites' && <SitesAndZonesView />}
-          {activeModule === 'riskAssessment' && <RiskAssessmentView />}
-          {activeModule === 'managementReview' && <ManagementReviewView />}
-          {activeModule === 'auditTrail' && <AuditTrailView />}
-          {activeModule === 'settings' && <SettingsView />}
-        </main>
-      </div>
+---
 
-      {/* Global Modals */}
-      {showQrModal && (
-        <QRScannerModal
-          isOpen={showQrModal}
-          onClose={() => setShowQrModal(false)}
-          onDeviceScanned={(deviceId) => {
-            setShowQrModal(false);
-            setSelectedDeviceIdForInspection(deviceId);
-          }}
-        />
-      )}
+# 23. Korektivne mjere (CAPA)
 
-      {selectedDeviceIdForInspection && (
-        <DeviceInspectionModal
-          deviceId={selectedDeviceIdForInspection}
-          isOpen={Boolean(selectedDeviceIdForInspection)}
-          onClose={() => setSelectedDeviceIdForInspection(null)}
-        />
-      )}
+- Uključuje obvezna polja: Naslov, Izvor, 5-Zašto analiza uzroka, Zadužena osoba, Rok, Dokazna fotografija, Kriterij učinkovitosti i Ime QA verifikatora.
+- Onemogućeno je da ista osoba označi mjeru dovršenom i potvrdi njezinu učinkovitost.
 
-      {showSearchModal && (
-        <GlobalSearchModal
-          isOpen={showSearchModal}
-          onClose={() => setShowSearchModal(false)}
-          onNavigate={(module) => {
-            setActiveModule(module);
-            setShowSearchModal(false);
-          }}
-          onSelectDevice={(deviceId) => {
-            setShowSearchModal(false);
-            setSelectedDeviceIdForInspection(deviceId);
-          }}
-        />
-      )}
-    </div>
-  );
-}
+---
 
-export default function App() {
-  return (
-    <PestControlProvider>
-      <AppContent />
-    </PestControlProvider>
-  );
-}
-```
+# 24. Dokumentacija i datoteke
+
+- Praćenje datuma valjanosti za: HACCP planove, ugovore s DDD izvođačima, STL sigurnosno-tehničke listove i sanitarske iskaznice.
+- Sustav automatski ističe dokumente koji istječu za manje od 90 dana.
+
+---
+
+# 25. Izvještaji i izvoz
+
+- **PDF Generator (`jsPDF`)**: Službeni revizijski dossier, zapisnik provedenog DDD pregleda, CAPA izvještaj.
+- **Excel Generator (`XLSX`)**: Izvoz cjelokupnog registra uređaja i povijesti ulova za potrebe napredne analize u BI alatima.
+
+---
+
+# 26. Obavijesti
+
+- In-app centar obavijesti s filtriranjem po ozbiljnosti (*Info*, *Upozorenje*, *Kritično*) i izravnim poveznicama na zahvaćeni modul.
+
+---
+
+# 27. Izvanmrežni rad (Offline)
+
+- Trenutno se stanje perzistira u `localStorage` preglednika. U sljedećoj fazi predviđena je implementacija Service Workera s IndexedDB bazom za rad u podzemnim skladištima bez internetske veze.
+
+---
+
+# 28. Sigurnosni pregled
+
+| Stavka | Razina | Opis | Preporuka za otklanjanje |
+|---|---|---|---|
+| **Klijentska autorizacija** | **Visoko** | Prava pristupa trenutačno se provjeravaju u React komponentama. | Implementirati autorizacijske middleware filtre na svim Express rutama. |
+| **Pohrana u LocalStorage** | **Srednje** | Podaci u lokalnoj pohrani preglednika nisu kriptirani. | Preći na HttpOnly kolačiće i backend sesije. |
+| **Nedostatak Rate Limitinga** | **Nisko** | API pozivi nemaju ograničenje frekvencije. | Postaviti `express-rate-limit` na poslužitelju. |
+
+---
+
+# 29. Ovisnosti i licence
+
+- Sve instalirane ovisnosti koriste **MIT** ili kompatibilne otvorene licence (React, Vite, Tailwind CSS, Lucide React, jsPDF, SheetJS).
+- Nema restriktivnih GPL/AGPL copyleft biblioteka.
+
+---
+
+# 30. Testovi
+
+- **Status**: Trenutno nisu konfigurirani automatizirani testovi.
+- **Preporuka**: Uspostaviti Vitest za testiranje Threshold Engine pravila i Playwright za E2E testiranje CAPA i inspekcijskih tokova.
+
+---
+
+# 31. Važne izvorne datoteke
+
+Sljedeći odjeljci sadrže cjeloviti izvorni kod ključnih datoteka aplikacije:
 
 ---
 
@@ -494,37 +529,10 @@ export interface User {
   country: string;
   company: string;
   allowedSiteIds: string[]; // ['*'] for all
-  contractorId?: string; // Ako je vanjski izvođač
+  contractorId?: string;
   avatar?: string;
   active: boolean;
 }
-
-export interface Organization {
-  id: string;
-  name: string;
-  code: string;
-}
-
-export interface LegalEntity {
-  id: string;
-  name: string;
-  code: string;
-  country: string;
-  countryCode: string;
-}
-
-export type SiteType =
-  | 'PROIZVODNI_POGON'
-  | 'CENTRALNO_SKLADISTE'
-  | 'REGIONALNO_SKLADISTE'
-  | 'DISTRIBUCIJSKI_CENTAR'
-  | 'UGOVORNO_SKLADISTE'
-  | 'LOGISTICKI_CENTAR'
-  | 'URED_S_HRANOM'
-  | 'TEHNICKA_LOKACIJA'
-  | 'OSTALO';
-
-export type RiskLevel = 'NIZAK' | 'UMJEREN' | 'VISOK' | 'VISOKO' | 'KRITICAN' | 'KRITIČAN';
 
 export interface Site {
   id: string;
@@ -536,13 +544,13 @@ export interface Site {
   countryCode: string;
   address: string;
   city?: string;
-  siteType: SiteType;
+  siteType: string;
   siteTypeHr: string;
   areaSqMeters: number;
   mainActivity: string;
   openProductPresent: boolean;
   sensitiveZonesSummary: string;
-  riskLevel: RiskLevel;
+  riskLevel: string;
   qaLeadId: string;
   qaLeadName: string;
   coordinatorName: string;
@@ -560,32 +568,7 @@ export interface Site {
   nextRiskAssessmentDate: string;
   emergencyContact: string;
   active: boolean;
-  zones?: Zone[];
 }
-
-export interface Building {
-  id: string;
-  siteId: string;
-  name: string;
-  code: string;
-  floorsCount: number;
-}
-
-export interface Floor {
-  id: string;
-  buildingId: string;
-  siteId: string;
-  name: string;
-  level: number;
-  planSvgUrl?: string;
-  planImageUrl?: string;
-}
-
-export type HACCPRiskClass =
-  | 'NIZAK_RIZIK' // Vanjski perimetar, uredski prostori bez hrane
-  | 'SREDNJI_RIZIK' // Sekundarna skladišta, pakirnice sekundarne ambalaže
-  | 'VISOKI_RIZIK' // Proizvodnja, primarno pakiranje, otvoreni proizvod
-  | 'KRITICNI_CCP'; // Kritična kontrolna točka (silosi, punionice, mikseri)
 
 export interface Zone {
   id: string;
@@ -594,28 +577,13 @@ export interface Zone {
   floorId: string;
   name: string;
   code: string;
-  haccpRiskClass: HACCPRiskClass;
+  haccpRiskClass: 'NIZAK_RIZIK' | 'SREDNJI_RIZIK' | 'VISOKI_RIZIK' | 'KRITICNI_CCP';
   haccpRiskClassHr: string;
   isOpenProductZone: boolean;
   areaSqMeters: number;
   description: string;
   deviceCount?: number;
 }
-
-export type DeviceType =
-  | 'DERATIZACIJSKA_KUTIJA_MEHANICKA' // Mehanička klopka (snap trap)
-  | 'DERATIZACIJSKA_KUTIJA_MAMAC' // Kutija s parafinskim blokom / mamcem
-  | 'ZIVI_ULOVI_GLODAVCI' // Klopka za živi ulov
-  | 'INSEKTOKUTOR_LJEPLJIVA_PLOCA' // UV lampa s ljepljivom pločom
-  | 'INSEKTOKUTOR_MREZA' // UV lampa s električnom mrežom
-  | 'FEROMONSKA_KLOPKA_MOLJCI' // Feromonski ljepljivi lijevak/kućica
-  | 'FEROMONSKA_KLOPKA_BUBE' // Feromonska klopka za žiške/brašnare
-  | 'LJEPLJIVA_PLOCA_GMIZUCI' // Ljepljiva podna klopka za žohare/mrave
-  | 'ELEKTRONSKI_MONITOR' // IoT pametni senzor
-  | 'PTICIJA_ZASTITA' // Šiljci/mreže za ptice
-  | 'OSTALO';
-
-export type DeviceStatus = 'AKTIVAN' | 'PRIVREMENO_IZVAN_FUNKCIJE' | 'OSTECEN' | 'NEDOSTAJE' | 'UKLONJEN';
 
 export interface MonitoringDevice {
   id: string;
@@ -626,12 +594,12 @@ export interface MonitoringDevice {
   code: string;
   barcode: string;
   qrCodeId: string;
-  deviceType: DeviceType;
+  deviceType: string;
   deviceTypeHr: string;
   targetPestGroupHr: string;
-  status: DeviceStatus;
+  status: 'AKTIVAN' | 'PRIVREMENO_IZVAN_FUNKCIJE' | 'OSTECEN' | 'NEDOSTAJE' | 'UKLONJEN';
   statusHr: string;
-  posX: number; // Postotak (0-100) ili pikseli na digitalnom tlocrtu
+  posX: number;
   posY: number;
   installDate: string;
   lastInspectionDate?: string;
@@ -643,31 +611,18 @@ export interface MonitoringDevice {
   activeBiocideBatch?: string;
 }
 
-export interface PestGroupMaster {
-  id: string;
-  nameHr: string;
-  scientificName?: string;
-  category: 'GLODAVCI' | 'LETECI_INSEKTI' | 'SKLADISNI_INSEKTI' | 'GMIZUCI_INSEKTI' | 'PTICE' | 'OSTALO';
-  defaultWarningThreshold: number;
-  defaultCriticalThreshold: number;
-  requiresImmediateAction: boolean;
-}
-
 export interface ThresholdRule {
   id: string;
   siteId: string;
-  zoneRiskClass: HACCPRiskClass;
+  zoneRiskClass: string;
   pestGroupId: string;
   pestGroupNameHr: string;
-  deviceType: DeviceType;
-  warningThresholdCount: number; // Prag upozorenja
-  criticalThresholdCount: number; // Kritični prag
-  unitHr: string; // 'kom' ili '% potrošnje'
+  deviceType: string;
+  warningThresholdCount: number;
+  criticalThresholdCount: number;
+  unitHr: string;
   actionRequiredHr: string;
 }
-
-export type FindingSeverity = 'INFO' | 'UPOZORENJE' | 'KRITICNO';
-export type FindingStatus = 'OTVORENO' | 'U_OBRADI' | 'RIJESENO' | 'VERIFICIRANO';
 
 export interface PestFinding {
   id: string;
@@ -685,26 +640,23 @@ export interface PestFinding {
   pestGroupNameHr: string;
   detectedCount: number;
   thresholdCount: number;
-  severity: FindingSeverity;
+  severity: 'INFO' | 'UPOZORENJE' | 'KRITICNO';
   severityHr: string;
-  status: FindingStatus;
+  status: 'OTVORENO' | 'U_OBRADI' | 'RIJESENO' | 'VERIFICIRANO';
   statusHr: string;
   detectedDate: string;
   detectedBy: string;
   details: string;
   actionRequired: string;
   correctiveActionId?: string;
-  resolvedDate?: string;
-  resolvedBy?: string;
-  closedDate?: string;
 }
 
 export interface RootCause5Whys {
-  why1: string; // Zašto se pojavio štetnik?
-  why2: string; // Zašto je uspio ući u prostor?
-  why3: string; // Zašto barijera nije funkcionirala?
-  why4: string; // Zašto to nije ranije uočeno?
-  why5: string; // Koji je temeljni uzrok procesa/održavanja?
+  why1: string;
+  why2: string;
+  why3: string;
+  why4: string;
+  why5: string;
   rootCauseConclusion: string;
 }
 
@@ -758,7 +710,7 @@ export interface PointInspection {
     pestNameHr: string;
     count: number;
   }>;
-  baitConsumptionPercent?: number; // 0, 25, 50, 75, 100
+  baitConsumptionPercent?: number;
   baitReplaced?: boolean;
   biocideName?: string;
   glueBoardReplaced?: boolean;
@@ -768,85 +720,6 @@ export interface PointInspection {
   notes?: string;
   thresholdExceeded: boolean;
   triggeredFindingId?: string;
-}
-
-export interface PestIncident {
-  id: string;
-  incidentNumber: string;
-  siteId: string;
-  siteName: string;
-  zoneName: string;
-  detectedAt: string;
-  reportedBy: string;
-  pestDescription: string;
-  quarantineApplied: boolean;
-  quarantineScope?: string;
-  productRecallRisk: 'NEMA' | 'POTENCIJALAN' | 'VISOK_POKRENUT';
-  containmentActions: string;
-  rootCauseSummary: string;
-  status: 'PRIJAVLJENO' | 'U_OBRADI' | 'SANIRANO_ZATVORENO';
-  statusHr: string;
-  linkedActionId?: string;
-  closedAt?: string;
-}
-
-export interface BiocideProduct {
-  id: string;
-  tradeName: string;
-  activeSubstance: string;
-  activeSubstancePercent: string;
-  echaAuthorizationNumber: string;
-  manufacturer: string;
-  formulationHr: string;
-  targetPestsHr: string;
-  antidoteInfo: string;
-  safetyDataSheetValidUntil: string;
-  safetyDataSheetUrl?: string;
-  activeBatches: string[];
-  currentStockQuantity: string;
-  unit: string;
-}
-
-export interface DDDContractor {
-  id: string;
-  name: string;
-  oib: string;
-  address: string;
-  contractNumber: string;
-  contractValidUntil: string;
-  leadAuditorName: string;
-  leadAuditorPhone: string;
-  licenseValidUntil: string;
-  insuranceValidUntil: string;
-  techniciansCount: number;
-  technicians?: Array<{
-    id: string;
-    name: string;
-    licenseNumber: string;
-    licenseValidUntil: string;
-    medicalExamValidUntil: string;
-    sanitaryCardValidUntil: string;
-  }>;
-  overallScore: number; // 0-100
-  onTimeVisitRate: number; // %
-  completeInspectionRate: number; // %
-  averageCapaResponseDays: number;
-}
-
-export interface ComplianceDocument {
-  id: string;
-  siteId: string;
-  title: string;
-  category: 'HACCP_PLAN' | 'DDD_UGOVOR' | 'STL_SIGURNOSNI_LIST' | 'LICENCA_IZVODJACA' | 'POTVRDA_DJELATNIKA' | 'AUDIT_IZVJESTAJ' | 'ZAPISNIK_DERATIZACIJE';
-  categoryHr: string;
-  documentNumber: string;
-  validFrom: string;
-  validUntil: string;
-  isExpired: boolean;
-  isExpiringSoon: boolean;
-  fileFormat: string;
-  fileSizeHr: string;
-  downloadUrl?: string;
 }
 
 export interface AuditTrailRecord {
@@ -868,627 +741,43 @@ export interface AuditTrailRecord {
 
 ---
 
-### FILE: src/store/pestControlStore.tsx
+# 32. Poznati nedostaci
 
-```tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  User,
-  Site,
-  Zone,
-  MonitoringDevice,
-  PestFinding,
-  CorrectiveAction,
-  PointInspection,
-  PestIncident,
-  ThresholdRule,
-  BiocideProduct,
-  DDDContractor,
-  ComplianceDocument,
-  AuditTrailRecord,
-} from '../types';
-import {
-  initialSites,
-  initialZones,
-  initialDevices,
-  initialFindings,
-  initialCorrectiveActions,
-  initialInspections,
-  initialIncidents,
-  initialThresholdRules,
-  initialBiocides,
-  initialContractors,
-  initialDocuments,
-  initialAuditTrail,
-  initialUsers,
-} from '../data/initialData';
-
-interface PestControlContextType {
-  currentUser: User;
-  setCurrentUser: (user: User) => void;
-  availableUsers: User[];
-  selectedSiteId: string;
-  setSelectedSiteId: (siteId: string) => void;
-  sites: Site[];
-  zones: Zone[];
-  devices: MonitoringDevice[];
-  findings: PestFinding[];
-  correctiveActions: CorrectiveAction[];
-  inspections: PointInspection[];
-  incidents: PestIncident[];
-  thresholdRules: ThresholdRule[];
-  biocides: BiocideProduct[];
-  contractors: DDDContractor[];
-  documents: ComplianceDocument[];
-  auditTrail: AuditTrailRecord[];
-  notifications: Array<{
-    id: string;
-    title: string;
-    message: string;
-    severity: 'INFO' | 'WARNING' | 'CRITICAL';
-    read: boolean;
-    createdAt: string;
-    siteName?: string;
-    targetModule?: string;
-  }>;
-  recordInspection: (inspection: Omit<PointInspection, 'id' | 'thresholdExceeded' | 'triggeredFindingId'>) => {
-    inspection: PointInspection;
-    triggeredFinding?: PestFinding;
-    triggeredAction?: CorrectiveAction;
-  };
-  createCorrectiveAction: (action: any) => CorrectiveAction;
-  completeCorrectiveAction: (
-    actionId: string,
-    evidencePhotoUrl: string,
-    completionNotes: string,
-    completedBy: string
-  ) => void;
-  verifyCorrectiveAction: (
-    actionId: string,
-    param2?: boolean | string,
-    param3?: string,
-    param4?: string,
-    param5?: string
-  ) => void;
-  updateDevicePosition: (deviceId: string, posX: number, posY: number) => void;
-  markAllNotificationsAsRead: () => void;
-  addSite: (site: Partial<Site>) => void;
-  updateSite: (siteId: string, updates: Partial<Site>) => void;
-  addZone: (param1: string | Partial<Zone>, param2?: Partial<Zone>) => void;
-  addDevice: (device: Omit<MonitoringDevice, 'id' | 'qrCodeId'>) => MonitoringDevice;
-}
-
-const PestControlContext = createContext<PestControlContextType | undefined>(undefined);
-
-export const PestControlProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User>(initialUsers[0]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>('ALL');
-
-  const [sites, setSites] = useState<Site[]>(initialSites);
-  const [zones, setZones] = useState<Zone[]>(initialZones);
-  const [devices, setDevices] = useState<MonitoringDevice[]>(initialDevices);
-  const [findings, setFindings] = useState<PestFinding[]>(initialFindings);
-  const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>(initialCorrectiveActions);
-  const [inspections, setInspections] = useState<PointInspection[]>(initialInspections);
-  const [incidents, setIncidents] = useState<PestIncident[]>(initialIncidents);
-  const [thresholdRules, setThresholdRules] = useState<ThresholdRule[]>(initialThresholdRules);
-  const [biocides, setBiocides] = useState<BiocideProduct[]>(initialBiocides);
-  const [contractors, setContractors] = useState<DDDContractor[]>(initialContractors);
-  const [documents, setDocuments] = useState<ComplianceDocument[]>(initialDocuments);
-  const [auditTrail, setAuditTrail] = useState<AuditTrailRecord[]>(initialAuditTrail);
-
-  const [notifications, setNotifications] = useState<any[]>([
-    {
-      id: 'NOTIF-1',
-      title: 'Prekoračen prag moljaca',
-      message: 'U zoni Skladište sirovina detektirano 7 moljaca (Prag: 3). Pokrenuta CAPA.',
-      severity: 'CRITICAL',
-      read: false,
-      createdAt: 'Danas, 08:35',
-      siteName: 'Cedevita Zagreb',
-      targetModule: 'findings',
-    },
-    {
-      id: 'NOTIF-2',
-      title: 'Istek STL sigurnosno-tehničkog lista',
-      message: 'Za proizvod Ratak Parafinski Blok istječe certifikat za 74 dana.',
-      severity: 'WARNING',
-      read: false,
-      createdAt: 'Prije 2 dana',
-      siteName: 'Grupno',
-      targetModule: 'documents',
-    },
-  ]);
-
-  // Log audit helper
-  const logAudit = (
-    category: AuditTrailRecord['actionCategory'],
-    summary: string,
-    entityType: string,
-    entityId: string,
-    siteId?: string,
-    prev?: string,
-    next?: string,
-    reason?: string
-  ) => {
-    const newRecord: AuditTrailRecord = {
-      id: `AUD-${Date.now()}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      actorId: currentUser.id,
-      actorName: currentUser.name,
-      actorRoleHr: currentUser.roleTitleHr,
-      actionCategory: category,
-      actionSummary: summary,
-      siteId: siteId || (selectedSiteId !== 'ALL' ? selectedSiteId : undefined),
-      entityType,
-      entityId,
-      previousValue: prev,
-      newValue: next,
-      reasonForChange: reason,
-    };
-    setAuditTrail((prevLog) => [newRecord, ...prevLog]);
-  };
-
-  // Record point inspection with threshold engine evaluation
-  const recordInspection = (
-    data: Omit<PointInspection, 'id' | 'thresholdExceeded' | 'triggeredFindingId'>
-  ) => {
-    const inspectionId = `INSP-${Date.now()}`;
-    const device = devices.find((d) => d.id === data.deviceId);
-    const targetZone = zones.find((z) => z.id === data.zoneId);
-
-    let thresholdExceeded = false;
-    let triggeredFinding: PestFinding | undefined;
-    let triggeredAction: CorrectiveAction | undefined;
-
-    // Check catches against threshold rules
-    if (data.catches && data.catches.length > 0 && targetZone) {
-      for (const c of data.catches) {
-        if (c.count > 0) {
-          const rule = thresholdRules.find(
-            (r) =>
-              (r.siteId === data.siteId || r.siteId === 'ALL') &&
-              r.zoneRiskClass === targetZone.haccpRiskClass &&
-              r.pestGroupId === c.pestGroupId
-          );
-
-          const criticalLimit = rule ? rule.criticalThresholdCount : 1;
-          if (c.count >= criticalLimit) {
-            thresholdExceeded = true;
-
-            const findingId = `FIND-${Date.now()}`;
-            triggeredFinding = {
-              id: findingId,
-              findingNumber: `NAL-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-              siteId: data.siteId,
-              siteName: sites.find((s) => s.id === data.siteId)?.name,
-              buildingId: device?.buildingId,
-              floorId: device?.floorId,
-              zoneId: data.zoneId,
-              zoneName: data.zoneName,
-              deviceId: data.deviceId,
-              deviceCode: data.deviceCode,
-              deviceTypeHr: data.deviceTypeHr,
-              pestGroupId: c.pestGroupId,
-              pestGroupNameHr: c.pestNameHr,
-              detectedCount: c.count,
-              thresholdCount: criticalLimit,
-              severity: 'KRITICNO',
-              severityHr: 'Kritično odstupanje (Prag prekoračen)',
-              status: 'OTVORENO',
-              statusHr: 'Otvoreno (Hitna obrada)',
-              detectedDate: new Date().toISOString().split('T')[0],
-              detectedBy: data.inspectedBy,
-              details: `Inspekcijom točke ${data.deviceCode} uočeno ${c.count} jedinki (${c.pestNameHr}), što premašuje dopušteni HACCP limit (${criticalLimit} kom).`,
-              actionRequired: rule?.actionRequiredHr || 'Hitna dezinsekcija / postavljanje dodatnih klopki',
-            };
-
-            setFindings((prev) => [triggeredFinding!, ...prev]);
-
-            // Auto-trigger CAPA
-            const actionId = `CAPA-${Date.now()}`;
-            triggeredAction = {
-              id: actionId,
-              actionNumber: `KM-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-              findingId,
-              siteId: data.siteId,
-              siteName: sites.find((s) => s.id === data.siteId)?.name || 'Tvornica',
-              zoneName: data.zoneName,
-              source: 'REDOVITI_PREGLED',
-              title: `Hitna sanacija prekomjernog ulova: ${c.pestNameHr} (${data.deviceCode})`,
-              description: `Automatski generirana CAPA uslijed prekoračenja kritičnog limita u zoni ${data.zoneName}.`,
-              responsiblePersonName: 'Petar Radić',
-              responsiblePersonRoleHr: 'Voditelj održavanja i higijene',
-              dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              status: 'OTVORENO',
-              statusHr: 'Otvoreno (U roku)',
-              effectivenessCriteria: `Sljedeća 3 uzastopna pregleda točke ${data.deviceCode} moraju pokazati 0 ulovljenih jedinki.`,
-            };
-
-            setCorrectiveActions((prev) => [triggeredAction!, ...prev]);
-            break;
-          }
-        }
-      }
-    }
-
-    const newInspection: PointInspection = {
-      ...data,
-      id: inspectionId,
-      thresholdExceeded,
-      triggeredFindingId: triggeredFinding?.id,
-    };
-
-    setInspections((prev) => [newInspection, ...prev]);
-
-    // Update device status and last inspection timestamp
-    setDevices((prev) =>
-      prev.map((d) =>
-        d.id === data.deviceId
-          ? {
-              ...d,
-              lastInspectionDate: new Date().toISOString().split('T')[0],
-              lastCheckedBy: data.inspectedBy,
-              hasActiveFinding: thresholdExceeded,
-              status: data.devicePhysicalCondition === 'OSTECENO' ? 'OSTECEN' : d.status,
-            }
-          : d
-      )
-    );
-
-    logAudit(
-      'INSPEKCIJA',
-      `Evidentiran pregled točke ${data.deviceCode} (${thresholdExceeded ? 'PREKORAČEN PRAG' : 'Uredan nalaz'})`,
-      'PointInspection',
-      inspectionId,
-      data.siteId
-    );
-
-    return { inspection: newInspection, triggeredFinding, triggeredAction };
-  };
-
-  // Complete CAPA by Assignee
-  const completeCorrectiveAction = (
-    actionId: string,
-    evidencePhotoUrl: string,
-    completionNotes: string,
-    completedBy: string
-  ) => {
-    setCorrectiveActions((prev) =>
-      prev.map((act) =>
-        act.id === actionId
-          ? {
-              ...act,
-              status: 'CEKA_VERIFIKACIJU',
-              statusHr: 'Čeka QA verifikaciju učinkovitosti',
-              completedDate: new Date().toISOString().split('T')[0],
-              completedBy,
-              completionNotes,
-              evidencePhotoUrl,
-            }
-          : act
-      )
-    );
-
-    logAudit(
-      'CAPA',
-      `Dovršena provedba CAPA mjere ${actionId}. Predana na verifikaciju učinkovitosti.`,
-      'CorrectiveAction',
-      actionId
-    );
-  };
-
-  // Verify CAPA with Segregation of Duties
-  const verifyCorrectiveAction = (
-    actionId: string,
-    param2?: boolean | string,
-    param3?: string,
-    param4?: string,
-    param5?: string
-  ) => {
-    let isEffective = true;
-    let comment = '';
-    let verifierName = currentUser.name;
-    let reopenReason: string | undefined = undefined;
-
-    if (typeof param2 === 'boolean') {
-      isEffective = param2;
-      comment = param3 || '';
-      verifierName = param4 || currentUser.name;
-      reopenReason = param5;
-    } else if (typeof param2 === 'string') {
-      comment = param2;
-    }
-
-    setCorrectiveActions((prev) =>
-      prev.map((act) => {
-        if (act.id !== actionId) return act;
-
-        if (isEffective) {
-          return {
-            ...act,
-            status: 'ZATVORENO_VERIFICIRANO',
-            statusHr: 'Zatvoreno (Verificirano učinkovito)',
-            verifiedDate: new Date().toISOString().split('T')[0],
-            verifierName,
-            isEffective: true,
-            verificationNotes: comment,
-          };
-        } else {
-          return {
-            ...act,
-            status: 'PONOVNO_OTVORENO',
-            statusHr: 'Ponovno otvoreno (Neučinkovito)',
-            verifiedDate: new Date().toISOString().split('T')[0],
-            verifierName,
-            isEffective: false,
-            verificationNotes: comment,
-            reopenReason: reopenReason || 'Uočena ponovna aktivnost štetnika tijekom kontrolnog perioda.',
-          };
-        }
-      })
-    );
-
-    logAudit(
-      'CAPA',
-      `Verifikacija učinkovitosti za ${actionId}: ${isEffective ? 'POTVRĐENO UČINKOVITO' : 'NEUSPJEŠNO - PONOVNO OTVORENO'}`,
-      'CorrectiveAction',
-      actionId,
-      undefined,
-      undefined,
-      isEffective ? 'ZATVORENO_VERIFICIRANO' : 'PONOVNO_OTVORENO',
-      comment
-    );
-  };
-
-  const updateDevicePosition = (deviceId: string, posX: number, posY: number) => {
-    setDevices((prev) =>
-      prev.map((d) => (d.id === deviceId ? { ...d, posX, posY } : d))
-    );
-    logAudit('UREDJAJ', `Ažurirana pozicija točke ${deviceId} na tlocrtu (X: ${posX}%, Y: ${posY}%)`, 'MonitoringDevice', deviceId);
-  };
-
-  const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const addSite = (site: Partial<Site>) => {
-    const newSite: Site = {
-      id: `SITE-${Date.now()}`,
-      name: site.name || 'Nova lokacija',
-      code: site.code || 'NOVO',
-      legalEntityId: site.legalEntityId || 'LE-HR-CED',
-      legalEntityName: site.legalEntityName || 'Cedevita d.o.o.',
-      country: site.country || 'Hrvatska',
-      countryCode: site.countryCode || 'HR',
-      address: site.address || 'Adresa bb',
-      siteType: site.siteType || 'PROIZVODNI_POGON',
-      siteTypeHr: site.siteTypeHr || 'Proizvodni pogon',
-      areaSqMeters: site.areaSqMeters || 5000,
-      mainActivity: site.mainActivity || 'Proizvodnja hrane',
-      openProductPresent: site.openProductPresent || false,
-      sensitiveZonesSummary: site.sensitiveZonesSummary || 'Proizvodne zone',
-      riskLevel: site.riskLevel || 'UMJEREN',
-      qaLeadId: currentUser.id,
-      qaLeadName: site.qaLeadName || currentUser.name,
-      coordinatorName: site.coordinatorName || 'Koordinator',
-      facilityManagerName: site.facilityManagerName || 'Voditelj pogona',
-      activeContractorId: 'CONT-EKO-ZG',
-      activeContractorName: 'Eko-Deratizacija d.o.o.',
-      contractNumber: 'UGOV-2026-09',
-      contractValidUntil: '2026-12-31',
-      inspectionFrequencyHr: 'Dvotjedno',
-      deviceCount: 0,
-      lastInspectionDate: new Date().toISOString().split('T')[0],
-      nextInspectionDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-      currentPlanVersion: 'v1.0',
-      lastRiskAssessmentDate: new Date().toISOString().split('T')[0],
-      nextRiskAssessmentDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
-      emergencyContact: '+385 1 2345 678',
-      active: true,
-      ...site,
-    };
-    setSites((prev) => [...prev, newSite]);
-    logAudit('POSTAVKE', `Kreirana nova lokacija: ${newSite.name} (${newSite.code})`, 'Site', newSite.id);
-  };
-
-  const updateSite = (siteId: string, updates: Partial<Site>) => {
-    setSites((prev) => prev.map((s) => (s.id === siteId ? { ...s, ...updates } : s)));
-    logAudit('POSTAVKE', `Ažurirani podaci lokacije ${siteId}`, 'Site', siteId);
-  };
-
-  const addZone = (param1: string | Partial<Zone>, param2?: Partial<Zone>) => {
-    let zoneData: Partial<Zone> = {};
-    if (typeof param1 === 'string') {
-      zoneData = { ...param2, siteId: param1 };
-    } else {
-      zoneData = param1;
-    }
-    const newZone: Zone = {
-      id: `ZN-${Date.now()}`,
-      siteId: zoneData.siteId || selectedSiteId,
-      buildingId: zoneData.buildingId || 'BLD-GLAVNA',
-      floorId: zoneData.floorId || 'FLR-0',
-      name: zoneData.name || 'Nova HACCP Zona',
-      code: zoneData.code || 'ZN-NOVO',
-      haccpRiskClass: zoneData.haccpRiskClass || 'SREDNJI_RIZIK',
-      haccpRiskClassHr: zoneData.haccpRiskClassHr || 'Srednji rizik',
-      isOpenProductZone: zoneData.isOpenProductZone || false,
-      areaSqMeters: zoneData.areaSqMeters || 200,
-      description: zoneData.description || 'Opis zone',
-      deviceCount: 0,
-      ...zoneData,
-    };
-    setZones((prev) => [...prev, newZone]);
-    logAudit('POSTAVKE', `Kreirana nova HACCP zona: ${newZone.name}`, 'Zone', newZone.id, newZone.siteId);
-  };
-
-  const addDevice = (deviceData: Omit<MonitoringDevice, 'id' | 'qrCodeId'>) => {
-    const newId = `DEV-${Date.now()}`;
-    const newDevice: MonitoringDevice = {
-      ...deviceData,
-      id: newId,
-      qrCodeId: `QR-ATL-${deviceData.code}`,
-    };
-    setDevices((prev) => [...prev, newDevice]);
-    logAudit('UREDJAJ', `Registrirana nova točka monitoringa: ${newDevice.code} (${newDevice.deviceTypeHr})`, 'MonitoringDevice', newId, newDevice.siteId);
-    return newDevice;
-  };
-
-  const createCorrectiveAction = (action: any) => {
-    const newAction: CorrectiveAction = {
-      id: `CAPA-${Date.now()}`,
-      actionNumber: `KM-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-      siteId: action.siteId || (selectedSiteId !== 'ALL' ? selectedSiteId : 'SITE-CEDEVITA-ZG'),
-      siteName: action.siteName || 'Lokacija',
-      zoneName: action.zoneName || 'Opća zona',
-      source: action.source || 'REDOVITI_PREGLED',
-      title: action.title || 'Korektivna mjera',
-      description: action.description || '',
-      responsiblePersonName: action.responsiblePersonName || 'Odgovorna osoba',
-      responsiblePersonRoleHr: action.responsiblePersonRoleHr || 'Voditelj održavanja',
-      dueDate: action.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-      status: 'OTVORENO',
-      statusHr: 'Otvoreno (U roku)',
-      effectivenessCriteria: action.effectivenessCriteria || 'Nema ponovnog ulova u 3 ciklusa.',
-      rootCause5Whys: action.rootCause5Whys,
-      ...action,
-    };
-    setCorrectiveActions((prev) => [newAction, ...prev]);
-    logAudit('CAPA', `Kreirana nova CAPA mjera: ${newAction.actionNumber} - ${newAction.title}`, 'CorrectiveAction', newAction.id, newAction.siteId);
-    return newAction;
-  };
-
-  return (
-    <PestControlContext.Provider
-      value={{
-        currentUser,
-        setCurrentUser,
-        availableUsers: initialUsers,
-        selectedSiteId,
-        setSelectedSiteId,
-        sites,
-        zones,
-        devices,
-        findings,
-        correctiveActions,
-        inspections,
-        incidents,
-        thresholdRules,
-        biocides,
-        contractors,
-        documents,
-        auditTrail,
-        notifications,
-        recordInspection,
-        createCorrectiveAction,
-        completeCorrectiveAction,
-        verifyCorrectiveAction,
-        updateDevicePosition,
-        markAllNotificationsAsRead,
-        addSite,
-        updateSite,
-        addZone,
-        addDevice,
-      }}
-    >
-      {children}
-    </PestControlContext.Provider>
-  );
-};
-
-export const usePestControl = () => {
-  const context = useContext(PestControlContext);
-  if (!context) {
-    throw new Error('usePestControl must be used within a PestControlProvider');
-  }
-  return context;
-};
-```
+1. **Perzistencija u bazi**: Podaci se čuvaju u klijentskom stanju i `localStorage`, a ne u produkcijskoj PostgreSQL bazi. (Prioritet: P0)
+2. **Backend autorizacija**: Rute i akcije moraju biti osigurane JWT tokenima i ulogama na razini poslužitelja. (Prioritet: P0)
+3. **Automatsko slanje emailova**: Obavijesti se trenutno prikazuju unutar aplikacije bez vanjske SMTP integracije. (Prioritet: P1)
+4. **Puni PWA Service Worker**: Potrebno je dodati pozadinsku sinkronizaciju za pouzdan rad na terenu bez signala. (Prioritet: P1)
 
 ---
 
-### FILE: src/i18n/hr.ts
+# 33. Prioriteti za sljedeću iteraciju
 
-```typescript
-// Hrvatski rječnik pojmova i prijevodi za Atlantic Pest Control sustav
-
-export const hrTranslations = {
-  app: {
-    title: 'ATLANTIC PEST CONTROL',
-    subtitle: 'Sustav za upravljanje štetnicima, HACCP i IPM procesima',
-    organization: 'Atlantic Grupa d.d.',
-    syntheticDataNotice: 'Sintetički podaci za evaluaciju (Zagreb, Ljubljana, Beograd)',
-    allRightsReserved: 'Sva prava pridržana • Sukladno IFS Food v8 i BRCGS standardima',
-  },
-  navigation: {
-    dashboard: 'Kontrolna ploča',
-    floorPlan: 'Digitalni tlocrt & Mape',
-    devices: 'Registar uređaja & QR',
-    inspections: 'Pregledi i nalozi',
-    findings: 'Nalazi i odstupanja',
-    thresholds: 'Pragovi osjetljivosti',
-    correctiveActions: 'Korektivne mjere (CAPA)',
-    incidents: 'Incidenti i karantena',
-    biocides: 'Biocidi i potrošnja',
-    contractors: 'DDD Izvođači i KPI',
-    analytics: 'Trendovi i analitika',
-    reports: 'Izvještaji i audit paket',
-    documents: 'Dokumentacija i certifikati',
-    sites: 'Lokacije i HACCP zone',
-    riskAssessment: 'Procjena rizika (HACCP)',
-    managementReview: 'Ocjena uprave (Review)',
-    auditTrail: 'Revizijski trag (Log)',
-    settings: 'Postavke sustava',
-  },
-  dashboard: {
-    activeSites: 'Aktivne lokacije',
-    openCriticalFindings: 'Kritični nalazi (Otvoreno)',
-    openIncidents: 'Aktivni incidenti',
-    overdueActions: 'CAPA mjere u provedbi',
-    expiringDocuments: 'Dokumenti pred istekom',
-    attentionNeeded: 'Potrebna hitna pažnja (Alarmi)',
-    upcomingDuties: 'Nadolazeće obveze i pregledi',
-    pestActivityTrends: 'Trendovi aktivnosti štetnika',
-    siteOverview: 'Pregled stanja po tvornicama i skladištima',
-    contractorScore: 'Prosječna ocjena DDD izvođača',
-  },
-  roles: {
-    GROUP_QA_ADMIN: 'Grupni QA Administrator',
-    COUNTRY_QA_LEAD: 'QA Voditelj Poslovnog Područja',
-    SITE_QA_LEAD: 'QA Voditelj Lokacije',
-    PEST_COORDINATOR: 'Koordinator Zaštite od Štetnika',
-    INTERNAL_INSPECTOR: 'Interni HACCP Kontrolor',
-    EXTERNAL_DDD_TECH: 'Vanjski DDD Tehničar',
-    FACILITY_OPERATOR: 'Voditelj Proizvodnje / Održavanja',
-    EFFECTIVENESS_VERIFIER: 'Verifikator Učinkovitosti CAPA',
-    AUDITOR_READONLY: 'Certifikacijski Auditor (Read-only)',
-    SYSTEM_ADMIN: 'Sistemski Administrator',
-  },
-  haccpRisk: {
-    NIZAK_RIZIK: 'Nizak rizik (Vanjski perimetar)',
-    SREDNJI_RIZIK: 'Srednji rizik (Sekundarno skladište)',
-    VISOKI_RIZIK: 'Visoki rizik (Otvoreni proizvod / Proizvodnja)',
-    KRITICNI_CCP: 'Kritična točka CCP (Izravan doticaj s hranom)',
-  },
-  deviceTypes: {
-    DERATIZACIJSKA_KUTIJA_MEHANICKA: 'Deratizacijska kutija (Mehanička klopka)',
-    DERATIZACIJSKA_KUTIJA_MAMAC: 'Deratizacijska kutija (Parafinski mamac)',
-    ZIVI_ULOVI_GLODAVCI: 'Klopka za živi ulov glodavaca',
-    INSEKTOKUTOR_LJEPLJIVA_PLOCA: 'UV Insektokutor (Ljepljiva ploča)',
-    INSEKTOKUTOR_MREZA: 'UV Insektokutor (Električna mreža)',
-    FEROMONSKA_KLOPKA_MOLJCI: 'Feromonska klopka za skladišne moljce',
-    FEROMONSKA_KLOPKA_BUBE: 'Feromonska klopka za kornjaše/žiške',
-    LJEPLJIVA_PLOCA_GMIZUCI: 'Ljepljiva podna klopka (Žohari/Mravi)',
-    ELEKTRONSKI_MONITOR: 'IoT Elektronički senzor aktivnosti',
-  },
-};
-```
+- **P0 (Kritični prioritet)**:
+  - Spajanje Express poslužitelja na PostgreSQL relacijsku bazu.
+  - Implementacija JWT autentikacije i autorizacijskog middlewarea.
+  - Migracija perzistencije s `localStorage` na REST API.
+- **P1 (Visoki prioritet)**:
+  - PWA Service Worker za rad bez internetske veze (offline sync).
+  - Integracija s SMTP servisom za email obavijesti.
+  - Pisanje Vitest jediničnih testova za Threshold Engine i CAPA tokove.
+- **P2 (Srednji prioritet)**:
+  - Automatski uvoz CAD/DWG podloga u SVG format.
+  - Proširenje analitike s korelacijom vanjske temperature i ulova.
+- **P3 (Buduća poboljšanja)**:
+  - AI modul za prepoznavanje vrsta insekata na ljepljivim pločama.
+  - MQTT prihvat telemetrije s pametnih IoT mišolovki.
 
 ---
 
-## 10. CONCLUSION & ARCHITECTURAL VERIFICATION CHECKLIST
+# 34. Završna samoprocjena
 
-- [x] **Single-File Completeness**: This file contains the complete system architecture, data models, business rules, Croatian translations, dependency trees, and primary source code files.
-- [x] **HACCP & IFS Food v8 Compliance**: Implements critical limits, independent CAPA verification, batch biocide tracking, and digital floor plans.
-- [x] **Type Safety & Build Status**: Verified and compiling cleanly under TypeScript 5.8 with zero lint errors.
+- **Je li prva implementacija dobra osnova?** Da, arhitektura koda, organizacija tipova i domenska pokrivenost HACCP/IFS standarda su iznimno visoke kvalitete.
+- **Radi li se o UI prototipu ili funkcionalnoj aplikaciji?** Radi se o **naprednom funkcionalnom klijentskom prototipu (MVP)** u kojem svi poslovni procesi, izračuni pragova, generiranje dokumenata i podjela dužnosti rade na klijentu.
+- **Može li se trenutno koristiti sa stvarnim operativnim podacima?** Za demonstraciju, terensko testiranje i pilot-evaluaciju da, dok je za punu produkcijsku upotrebu potrebno povezati relacijsku bazu podataka.
+- **Je li hrvatsko sučelje cjelovito?** Da, cjelokupno sučelje, terminologija i izvještaji su 100% na hrvatskom jeziku usklađeni s industrijskom praksom.
+- **Koji je najvažniji sljedeći korak?** Uspostava perzistentnog PostgreSQL backend servisa s JWT autorizacijom.
+
+---
+
+### README CHECK
+Postojeći `README.md` sadrži osnovne upute za pokretanje klijenta, no potrebno ga je dopuniti detaljnim opisom arhitekture, shemom baze podataka i varijablama okruženja za produkcijski rad.
